@@ -115,6 +115,26 @@ describe('postgame review', () => {
     expect(shiftedReview.entries[2].replyFound).toBe(true)
   })
 
+  it('underlines a mate opportunity and marks a reply that preserves mate', () => {
+    const chess = new Chess()
+    for (const move of ['e4', 'f6', 'e5']) chess.move(move)
+    const moves = chess.history({ verbose: true })
+    const positions: SearchResult[] = [
+      { rootTurn: 'w', bestMove: 'e2e4', lines: [{ rank: 1, depth: 12, score: { kind: 'cp', value: 0 }, moves: ['e2e4'] }] },
+      { rootTurn: 'b', bestMove: 'e7e5', lines: [{ rank: 1, depth: 12, score: { kind: 'cp', value: 0 }, moves: ['e7e5'] }] },
+      { rootTurn: 'w', bestMove: 'e4e5', lines: [{ rank: 1, depth: 12, score: { kind: 'mate', value: 3 }, moves: ['e4e5'] }] },
+      { rootTurn: 'b', bestMove: 'g7g6', lines: [{ rank: 1, depth: 12, score: { kind: 'mate', value: -2 }, moves: ['g7g6'] }] },
+    ]
+    const opportunity = { fen: moves[1].before, ply: 1, cpuMove: 'f7f6', suggestedReply: 'd2d4', estimatedLossCp: 0, mate: true }
+    const review = buildReview(moves, positions, [opportunity])
+    expect(review.entries[1].opportunity).toBe('used')
+    expect(review.entries[2].replyFound).toBe(true)
+    expect(moveAnnotation(review.entries[2])).toBe('!')
+    const missed = buildReview(moves, [positions[0], positions[1], positions[2], { ...positions[3], lines: [{ ...positions[3].lines[0], score: { kind: 'cp', value: -100 } }] }], [opportunity])
+    expect(missed.entries[1].opportunity).toBe('missed')
+    expect(moveAnnotation(missed.entries[2])).toBe('?')
+  })
+
   it('keeps the full principal variation for the hover text', () => {
     const chess = new Chess()
     chess.move('e4')

@@ -11,12 +11,15 @@ export interface GeneratedOpportunity {
   cpuMove: string
   suggestedReply: string
   estimatedLossCp: number
+  mate?: boolean
+  source?: 'discovered'
 }
 
 export interface CandidateMistake {
   move: string
   reply: string
   lossCp: number
+  mate?: boolean
 }
 
 const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.25, sometimes: 0.5, often: 0.85, almostAlways: 0.95 }
@@ -59,28 +62,53 @@ export function findCandidateMistake(fen: string, shallow: SearchResult, deep: S
   if (shallow.rootTurn !== deep.rootTurn) return null
   const shallowBest = shallow.lines.find((line) => line.rank === 1)
   const deepBest = deep.lines.find((line) => line.rank === 1)
-  if (!shallowBest || !deepBest || shallowBest.score.kind !== 'cp' || deepBest.score.kind !== 'cp') return null
+  if (!shallowBest || !deepBest || shallowBest.score.kind !== 'cp'
+    || deepBest.score.kind === 'mate' && deepBest.score.value <= 0) return null
   const [minimum, maximum] = mistakeBand(size)
   const plausible = new Map(shallow.lines.filter((line) => line.score.kind === 'cp' && shallowBest.score.value - line.score.value <= plausibleLoss[size]).map((line) => [line.moves[0], line]))
   const candidates = deep.lines
-    .filter((line) => line.rank > 1 && line.score.kind === 'cp' && line.moves.length > 1 && plausible.has(line.moves[0]))
-    .map((line) => ({ move: line.moves[0], reply: line.moves[1], lossCp: deepBest.score.value - line.score.value, cpuScore: line.score.value }))
-    .filter((candidate) => candidate.lossCp >= minimum && candidate.lossCp <= maximum && candidate.cpuScore <= -30 && legalReply(fen, candidate.move, candidate.reply))
-    .sort((a, b) => Math.abs(a.lossCp - (minimum + maximum) / 2) - Math.abs(b.lossCp - (minimum + maximum) / 2) || a.lossCp - b.lossCp)
+    .filter((line) => line.rank > 1 && line.moves.length > 1 && plausible.has(line.moves[0]))
+    .map((line) => ({
+      move: line.moves[0], reply: line.moves[1],
+      mate: line.score.kind === 'mate' && line.score.value < 0,
+      lossCp: deepBest.score.kind === 'cp' && line.score.kind === 'cp' ? deepBest.score.value - line.score.value : 0,
+      cpuScore: line.score.kind === 'cp' ? line.score.value : 0,
+    }))
+    .filter((candidate) => (candidate.mate || deepBest.score.kind === 'cp' && candidate.lossCp >= minimum && candidate.lossCp <= maximum && candidate.cpuScore <= -30)
+      && legalReply(fen, candidate.move, candidate.reply))
+    .sort((a, b) => Number(b.mate) - Number(a.mate)
+      || Math.abs(a.lossCp - (minimum + maximum) / 2) - Math.abs(b.lossCp - (minimum + maximum) / 2) || a.lossCp - b.lossCp)
   const selected = candidates[0]
-  return selected ? { move: selected.move, reply: selected.reply, lossCp: selected.lossCp } : null
+  return selected ? { move: selected.move, reply: selected.reply, lossCp: selected.lossCp, ...(selected.mate ? { mate: true } : {}) } : null
 }
 
 export function confirmCandidateMistake(fen: string, root: SearchResult, after: SearchResult, candidate: CandidateMistake, size: MistakeSize): CandidateMistake | null {
   if (root.rootTurn === after.rootTurn) return null
   const rootBest = root.lines.find((line) => line.rank === 1)
   const replyBest = after.lines.find((line) => line.rank === 1)
+  const reply = replyBest?.moves[0]
+  if (!reply || !legalReply(fen, candidate.move, reply)) return null
+  if (candidate.mate) {
+    if (replyBest?.score.kind !== 'mate' || replyBest.score.value <= 0) return null
+    return { move: candidate.move, reply, lossCp: 0, mate: true }
+  }
   if (rootBest?.score.kind !== 'cp' || replyBest?.score.kind !== 'cp') return null
-  const reply = replyBest.moves[0]
   const lossCp = rootBest.score.value + replyBest.score.value
   const [minimum, maximum] = mistakeBand(size)
-  if (!reply || replyBest.score.value < 30 || lossCp < minimum || lossCp > maximum || !legalReply(fen, candidate.move, reply)) return null
+  if (replyBest.score.value < 30 || lossCp < minimum || lossCp > maximum) return null
   return { move: candidate.move, reply, lossCp }
+}
+
+export function findMateReply(fen: string, result: SearchResult): string | null {
+  if (result.rootTurn !== (fen.split(' ')[1] === 'b' ? 'b' : 'w')) return null
+  const best = result.lines.find((line) => line.rank === 1)
+  if (best?.score.kind !== 'mate' || best.score.value <= 0 || !best.moves[0]) return null
+  try {
+    new Chess(fen).move(fromUci(best.moves[0]))
+    return best.moves[0]
+  } catch {
+    return null
+  }
 }
 
 function legalReply(fen: string, move: string, reply: string): boolean {

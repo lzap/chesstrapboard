@@ -154,17 +154,30 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
     const replyEntry = entries[opportunity.ply + 1]
     if (!cpuEntry) continue
     let outcome: OpportunityOutcome
-    const confirmationFloor = Math.min(60, Math.max(25, Math.round(opportunity.estimatedLossCp * 0.6)))
-    if (cpuEntry.lossCp === null || cpuEntry.lossCp < confirmationFloor) outcome = 'unconfirmed'
-    else if (!replyEntry) outcome = 'no-reply'
-    else if (replyEntry.lossCp === null) outcome = 'unconfirmed'
-    else if (replyEntry.lossCp <= 50 || (positions[opportunity.ply + 1]?.bestMove && toUci(moves[opportunity.ply + 1]) === positions[opportunity.ply + 1].bestMove)) outcome = 'used'
-    else if (replyEntry.lossCp <= 120) outcome = 'partial'
-    else outcome = 'missed'
+    let replyFound = false
+    if (opportunity.mate) {
+      const afterCpu = positions[opportunity.ply + 1]?.lines.find((line) => line.rank === 1)
+      const afterReply = positions[opportunity.ply + 2]?.lines.find((line) => line.rank === 1)
+      if (replyEntry) replyFound = toUci(moves[opportunity.ply + 1]) === opportunity.suggestedReply
+        || moves[opportunity.ply + 1].san.endsWith('#')
+        || afterReply?.score.kind === 'mate' && afterReply.score.value < 0
+      if (afterCpu?.score.kind !== 'mate' || afterCpu.score.value <= 0) outcome = 'unconfirmed'
+      else if (!replyEntry) outcome = 'no-reply'
+      else outcome = replyFound ? 'used' : 'missed'
+    } else {
+      const confirmationFloor = Math.min(60, Math.max(25, Math.round(opportunity.estimatedLossCp * 0.6)))
+      if (cpuEntry.lossCp === null || cpuEntry.lossCp < confirmationFloor) outcome = 'unconfirmed'
+      else if (!replyEntry) outcome = 'no-reply'
+      else if (replyEntry.lossCp === null) outcome = 'unconfirmed'
+      else if (replyEntry.lossCp <= 50 || (positions[opportunity.ply + 1]?.bestMove && toUci(moves[opportunity.ply + 1]) === positions[opportunity.ply + 1].bestMove)) outcome = 'used'
+      else if (replyEntry.lossCp <= 120) outcome = 'partial'
+      else outcome = 'missed'
+      if (replyEntry) replyFound = toUci(moves[opportunity.ply + 1]) === opportunity.suggestedReply || outcome === 'used'
+    }
     cpuEntry.opportunity = outcome
     if (replyEntry) {
-      replyEntry.replyFound = toUci(moves[opportunity.ply + 1]) === opportunity.suggestedReply || outcome === 'used'
-      if (replyEntry.replyFound) used += 1
+      replyEntry.replyFound = replyFound
+      if (replyFound) used += 1
       else missed += 1
     }
   }

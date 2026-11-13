@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake } from './traps'
+import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, findMateReply, selectEngineMove, shouldAttemptMistake } from './traps'
+import { Chess } from 'chess.js'
 import type { SearchResult } from './engine'
 
 const shallow: SearchResult = {
@@ -77,5 +78,19 @@ describe('generated mistake selection', () => {
   it('does not treat mate scores as comparable centipawns', () => {
     const withMate: SearchResult = { ...deep, lines: [{ ...deep.lines[0], score: { kind: 'mate', value: 3 } }, ...deep.lines.slice(1)] }
     expect(findCandidateMistake(fen, shallow, withMate, 'medium')).toBeNull()
+  })
+
+  it('accepts a confirmed forced mate regardless of the pawn-size band', () => {
+    const mateLine: SearchResult = { ...deep, lines: [deep.lines[0], { ...deep.lines[1], score: { kind: 'mate', value: -3 } }] }
+    const candidate = findCandidateMistake(fen, shallow, mateLine, 'mild')
+    expect(candidate).toEqual({ move: 'f7f6', reply: 'e4e5', lossCp: 0, mate: true })
+    const after = new Chess(fen)
+    after.move({ from: 'f7', to: 'f6' })
+    const reply: SearchResult = { rootTurn: 'w', bestMove: 'e4e5', lines: [{ rank: 1, depth: 14, score: { kind: 'mate', value: 3 }, moves: ['e4e5'] }] }
+    expect(confirmCandidateMistake(fen, mateLine, reply, candidate!, 'mild')).toEqual(candidate)
+    expect(confirmCandidateMistake(fen, mateLine, { ...reply, lines: [{ ...reply.lines[0], score: { kind: 'cp', value: 600 } }] }, candidate!, 'mild')).toBeNull()
+    expect(findMateReply(after.fen(), reply)).toBe('e4e5')
+    expect(findMateReply(after.fen(), { ...reply, rootTurn: 'b' })).toBeNull()
+    expect(findMateReply(after.fen(), { ...reply, lines: [{ ...reply.lines[0], moves: ['e4e6'] }] })).toBeNull()
   })
 })

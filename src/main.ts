@@ -2,11 +2,11 @@ import { Chess, type Color, type Square } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore, type SearchResult } from './engine'
-import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
+import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, toUci, type Opening } from './openings'
 import { buildReview, formatScore, moveAnnotation, reviewBudget, reviewPositions, ReviewSearchCache, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
-import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
+import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, findMateReply, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
 const element = <T extends HTMLElement>(selector: string): T => document.querySelector<T>(selector)!
@@ -66,19 +66,41 @@ function scheduleBackground(): void {
   }, 300)
 }
 
+async function detectMateOpportunity(current: TrainingSession, result: SearchResult, token: number): Promise<void> {
+  const moves = current.chess.history({ verbose: true })
+  const last = moves.at(-1)
+  const ply = moves.length - 1
+  if (!last || last.color === current.playerColor || current.opportunities.some((opportunity) => opportunity.ply === ply)) return
+  const fen = current.chess.fen()
+  if (!findMateReply(fen, result)) return
+  const confirmed = reviewCache.get(fen, 1200, 2) ?? await analysisEngine.search(fen, 1200, 2)
+  if (!canAnalyzeInBackground(current, token)) return
+  reviewCache.store(fen, 1200, 2, confirmed)
+  const reply = findMateReply(fen, confirmed)
+  if (!reply) return
+  current.opportunities.push({ fen: last.before, ply, cpuMove: toUci(last), suggestedReply: reply, estimatedLossCp: 0, mate: true, source: 'discovered' })
+  sounds.playOpportunity()
+  render()
+}
+
 async function analyzeInBackground(current: TrainingSession, token: number): Promise<void> {
   backgroundRunning = true
   try {
     const positions = reviewPositions(current.chess)
-    for (let index = 0; index < positions.length; index += 1) {
+    const indexes = positions.map((_, index) => index)
+    if (!current.completed) indexes.unshift(indexes.pop()!)
+    for (const index of indexes) {
       if (!canAnalyzeInBackground(current, token)) return
       const fen = positions[index]
       const milliseconds = reviewBudget(index, current.opportunities, !current.completed)
-      if (reviewCache.get(fen, milliseconds, 2)) continue
-      const result = await analysisEngine.search(fen, milliseconds, 2)
-      if (!canAnalyzeInBackground(current, token)) return
-      reviewCache.store(fen, milliseconds, 2, result)
-      if (current.completed) refreshReview(current)
+      let result = reviewCache.get(fen, milliseconds, 2)
+      if (!result) {
+        result = await analysisEngine.search(fen, milliseconds, 2)
+        if (!canAnalyzeInBackground(current, token)) return
+        reviewCache.store(fen, milliseconds, 2, result)
+        if (current.completed) refreshReview(current)
+      }
+      if (index === positions.length - 1 && !current.completed) await detectMateOpportunity(current, result, token)
     }
   } catch (error) {
     if (canAnalyzeInBackground(current, token)) console.warn('[Chess Trap Board] Background analysis unavailable:', error)
@@ -375,9 +397,10 @@ async function runCpu(): Promise<void> {
   const current = session
   if (!current || !current.isCpuTurn) return
   const ply = current.chess.history().length
-  const lastOpportunity = current.opportunities.at(-1)
+  const deliberateOpportunities = current.opportunities.filter((opportunity) => opportunity.source !== 'discovered')
+  const lastOpportunity = deliberateOpportunities.at(-1)
   const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
-  const attempt = canSeekOpportunity(current.absolutePly, current.availableOpeningLength, current.opportunities.length,
+  const attempt = canSeekOpportunity(current.absolutePly, current.availableOpeningLength, deliberateOpportunities.length,
     lastOpportunity ? current.startingPly + lastOpportunity.ply : undefined)
     && shouldAttemptMistake(frequency, Math.random())
   if (attempt) current.recordOpportunityCheck(ply)
@@ -427,7 +450,7 @@ async function runCpu(): Promise<void> {
     const chosenMove = candidate?.move ?? selectEngineMove(fen, result)
     if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
     if (candidate) {
-      current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
+      current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp, ...(candidate.mate ? { mate: true } : {}) })
     }
     sounds.playAfterMove(current.chess, Boolean(candidate))
     render()
