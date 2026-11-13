@@ -2,9 +2,9 @@ import { Chess, type Color } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore } from './engine'
-import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, toUci, type Opening } from './openings'
+import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, type Opening } from './openings'
 import { analyzeGame, annotationForMove, formatScore, whiteShare, type GameReview } from './review'
-import { TrainingSession, type Mode } from './session'
+import { TrainingSession } from './session'
 import { GameSounds } from './sound'
 import { findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
@@ -18,7 +18,6 @@ let session: TrainingSession | null = null
 let playerColor: Color = 'w'
 let orientation: Color = 'w'
 let loadError = ''
-let mode: Mode = 'memorize'
 let thinking = false
 let engineError = false
 let generation = 0
@@ -40,9 +39,8 @@ const sounds = new GameSounds()
 function savePreferences(): void {
   try {
     localStorage.setItem(preferencesKey, JSON.stringify({
-      mode, playerColor,
+      playerColor,
       opening: selectedOpening ? [selectedOpening.eco, selectedOpening.name] : null,
-      hint: element<HTMLInputElement>('#hint-toggle').checked,
       evaluation: element<HTMLInputElement>('#evaluation-toggle').checked,
       difficulty: element<HTMLSelectElement>('#difficulty').value,
       frequency: element<HTMLSelectElement>('#mistake-frequency').value,
@@ -57,11 +55,9 @@ function savePreferences(): void {
 function restorePreferences(): [string, string] | null {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? '{}') as Record<string, unknown>
-    if (saved.mode === 'traps') mode = 'traps'
     if (saved.playerColor === 'b') playerColor = 'b'
     orientation = playerColor
     element<HTMLInputElement>(`input[name="side"][value="${playerColor}"]`).checked = true
-    element<HTMLInputElement>('#hint-toggle').checked = saved.hint === true
     element<HTMLInputElement>('#evaluation-toggle').checked = saved.evaluation === true
     element<HTMLInputElement>('#sound-toggle').checked = saved.sound === true
     element<HTMLInputElement>('#opportunity-sound-toggle').checked = saved.opportunitySound === true
@@ -151,18 +147,11 @@ function navigateTo(ply: number): void {
 
 const board = new BoardView(element('#board-container'), (input) => {
   if (!session) return
-  const before = session.chess.history().length
   const move = session.playPlayer(input)
-  if (move) {
-    sounds.playMove()
-    if (session.mode === 'memorize' && session.chess.history().length > before + 1) {
-      const current = session
-      window.setTimeout(() => { if (session === current) sounds.playMove() }, 130)
-    }
-  }
+  if (move) sounds.playMove()
   render()
   if (move) void evaluateVisiblePosition()
-  if (move && mode === 'traps') {
+  if (move) {
     if (session.completed) void runReview()
     else void runCpu()
   }
@@ -190,7 +179,7 @@ function difficultyBudget(): number {
 
 async function runCpu(): Promise<void> {
   const current = session
-  if (!current || current.mode !== 'traps' || !current.isCpuTurn) return
+  if (!current || !current.isCpuTurn) return
   if (current.advanceBook()) {
     sounds.playMove()
     render()
@@ -243,7 +232,7 @@ async function runCpu(): Promise<void> {
 
 async function runReview(): Promise<void> {
   const current = session
-  if (!current || current.mode !== 'traps' || !current.completed) return
+  if (!current || !current.completed) return
   const token = generation
   cancelEvaluation()
   reviewing = true
@@ -275,12 +264,6 @@ async function runReview(): Promise<void> {
     reviewError = error instanceof Error ? error.message : 'Review failed'
     render()
   }
-}
-
-function expectedSan(current: TrainingSession): string | null {
-  if (!current.expected) return null
-  const expected = fromUci(current.expected)
-  return current.chess.moves({ verbose: true }).find((move) => toUci(move) === toUci(expected))?.san ?? null
 }
 
 function renderOpeningResults(): void {
@@ -325,28 +308,7 @@ function renderOpeningSelection(): void {
   const san = openingSan(selectedOpening)
   preview.textContent = san.slice(0, 10).map((move, index) => `${index % 2 === 0 ? `${Math.floor(index / 2) + 1}. ` : ''}${move}`).join(' ') + (san.length > 10 ? ' …' : '')
   panel.append(title, preview)
-  const hasPlayerMove = selectedOpening.moves.some((_, index) => index % 2 === (playerColor === 'w' ? 0 : 1))
-  if (mode === 'memorize' && !hasPlayerMove) {
-    const note = document.createElement('p')
-    note.textContent = 'Choose a longer variation to practice this color.'
-    panel.append(note)
-  }
-  element<HTMLButtonElement>('#start-button').disabled = mode === 'memorize' && !hasPlayerMove
-}
-
-function renderModeControls(): void {
-  for (const [name, id] of [['memorize', '#memorize-mode'], ['traps', '#traps-mode']] as const) {
-    const button = element<HTMLButtonElement>(id)
-    button.classList.toggle('active', mode === name)
-    button.setAttribute('aria-pressed', String(mode === name))
-  }
-  element<HTMLLabelElement>('#hint-option').hidden = mode !== 'memorize'
-  element<HTMLLabelElement>('#opportunity-sound-option').hidden = mode !== 'traps'
-  element<HTMLDivElement>('#trap-controls').hidden = mode !== 'traps'
-  element<HTMLButtonElement>('#undo-button').hidden = mode !== 'memorize'
-  element<HTMLButtonElement>('#finish-button').hidden = mode !== 'traps'
-  element<HTMLButtonElement>('#new-button').textContent = mode === 'memorize' ? 'Restart line' : 'New game'
-  element<HTMLButtonElement>('#start-button').textContent = mode === 'memorize' ? 'Start practice' : 'Start game'
+  element<HTMLButtonElement>('#start-button').disabled = false
 }
 
 function renderReview(): void {
@@ -360,7 +322,7 @@ function renderReview(): void {
   meter.hidden = !reviewing
   meter.value = reviewTotal ? Math.round(reviewDone / reviewTotal * 100) : 0
   element<HTMLButtonElement>('#cancel-review').hidden = !reviewing
-  element<HTMLButtonElement>('#review-button').hidden = !session || session.mode !== 'traps' || !session.completed || reviewing
+  element<HTMLButtonElement>('#review-button').hidden = !session || !session.completed || reviewing
   if (review && session) {
     const actualOpening = classifyGame(session.chess, openings)
     element<HTMLElement>('#review-summary').textContent = `${session.openingReached ? 'Target opening reached.' : `Target opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${review.generated} generated opportunity ${review.generated === 1 ? 'attempt' : 'attempts'}; ${review.used} used, ${review.missed} missed. Marks are estimates: ?! inaccuracy, ? mistake, ?? blunder, ! strong reply, !! used opportunity, !? partial opportunity.`
@@ -391,7 +353,6 @@ function renderReview(): void {
 }
 
 function render(): void {
-  renderModeControls()
   const chess = session?.chess ?? previewChess
   const position = positionPly()
   const viewingHistory = Boolean(session && position < chess.history().length)
@@ -399,16 +360,12 @@ function render(): void {
   element<HTMLElement>('#status').textContent = viewingHistory
     ? position === 0 ? 'Viewing starting position' : `Viewing move ${position} of ${chess.history().length}`
     : session?.completed
-    ? session.mode === 'memorize' ? 'Opening line complete' : session.finishReason ? 'Game ended' : gameStatus(chess)
+    ? session.finishReason ? 'Game ended' : gameStatus(chess)
     : thinking ? 'Computer is thinking…' : session ? gameStatus(chess) : 'Choose an opening to begin'
-  element<HTMLElement>('#turn-chip').textContent = mode === 'memorize' ? 'Memorize lines' : 'Explore traps'
   element<HTMLElement>('#board-hint').textContent = viewingHistory ? 'History · return to latest to play' : session
-    ? session.mode === 'memorize'
-      ? `${Math.min(chess.history().length, session.opening.moves.length)} of ${session.opening.moves.length} line moves`
-      : session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game'
+    ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game'
     : 'Select an opening to begin'
-  const hint = mode === 'memorize' && session?.isPlayerTurn && element<HTMLInputElement>('#hint-toggle').checked ? expectedSan(session) : null
-  element<HTMLElement>('#feedback').textContent = session?.feedback || (hint ? `Next move: ${hint}` : thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed && mode === 'traps' ? 'Game finished. Review the moves below.' : session ? mode === 'memorize' ? 'Follow the line. A different move will be corrected immediately.' : 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
+  element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
   const moveList = element<HTMLDivElement>('#move-list')
@@ -456,7 +413,6 @@ function render(): void {
     }
   }
   element<HTMLButtonElement>('#copy-button').disabled = !session || moves.length === 0
-  element<HTMLButtonElement>('#undo-button').disabled = !session || moves.length === 0
   element<HTMLButtonElement>('#finish-button').disabled = !session || session.completed
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = !selectedOpening
@@ -466,13 +422,13 @@ function render(): void {
 function startPractice(): void {
   if (!selectedOpening) return
   invalidateGame()
-  session = new TrainingSession(selectedOpening, mode, playerColor)
+  session = new TrainingSession(selectedOpening, playerColor)
   orientation = playerColor
   sounds.activate()
   if (session.chess.history().length) sounds.playMove()
   render()
   void evaluateVisiblePosition()
-  if (mode === 'traps') void runCpu()
+  void runCpu()
 }
 
 let lastWheelStep = 0
@@ -500,26 +456,8 @@ document.addEventListener('keydown', (event) => {
 })
 
 element<HTMLInputElement>('#opening-search').addEventListener('input', renderOpeningResults)
-for (const [name, id] of [['memorize', '#memorize-mode'], ['traps', '#traps-mode']] as const) {
-  element<HTMLButtonElement>(id).addEventListener('click', () => {
-    if (mode === name) return
-    invalidateGame()
-    mode = name
-    session = null
-    savePreferences()
-    renderOpeningSelection()
-    render()
-  })
-}
 element<HTMLButtonElement>('#start-button').addEventListener('click', startPractice)
 element<HTMLButtonElement>('#new-button').addEventListener('click', startPractice)
-element<HTMLButtonElement>('#undo-button').addEventListener('click', () => {
-  session?.undoPractice()
-  session?.advanceBook()
-  viewPly = null
-  render()
-  void evaluateVisiblePosition()
-})
 element<HTMLButtonElement>('#flip-button').addEventListener('click', () => {
   orientation = orientation === 'w' ? 'b' : 'w'
   render()
@@ -555,7 +493,6 @@ document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio
   renderOpeningSelection()
   render()
 }))
-element<HTMLInputElement>('#hint-toggle').addEventListener('change', () => { savePreferences(); render() })
 element<HTMLInputElement>('#evaluation-toggle').addEventListener('change', () => {
   savePreferences()
   if (element<HTMLInputElement>('#evaluation-toggle').checked) void evaluateVisiblePosition()

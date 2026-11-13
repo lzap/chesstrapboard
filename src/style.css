@@ -25,9 +25,6 @@ a { color: #d9bb78; }
 .intro-panel { padding: 25px; }
 .eyebrow { color: #e0bd77; font-size: 10px; font-weight: 800; letter-spacing: .19em; margin: 0; }
 .intro-panel > p:not(.eyebrow) { color: #c3cec0; line-height: 1.55; font-size: 14px; }
-.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 5px; background: #16241b; border-radius: 11px; margin: 0 0 22px; }
-.mode-button { background: none; color: #b8c7b6; border: 0; border-radius: 8px; padding: 10px 6px; font-size: 11px; font-weight: 800; }
-.mode-button.active { background: #d9bb78; color: #1f291e; }
 .field-label { display: block; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
 #opening-search { width: 100%; border: 1px solid #648064; border-radius: 9px; background: #16241b; color: #f3f1e9; padding: 11px 12px; font-size: 12px; }
 #opening-search::placeholder { color: #9aab99; }
@@ -44,7 +41,6 @@ a { color: #d9bb78; }
 .side-picker input, .check-option input { accent-color: #d9bb78; }
 .check-option { font-size: 12px; margin: 0 0 15px; }
 .trap-controls { margin: 15px 0; }
-.trap-controls[hidden], .check-option[hidden], .action-row button[hidden] { display: none; }
 .trap-controls select { width: 100%; border: 1px solid #648064; border-radius: 9px; background: #16241b; color: #f3f1e9; padding: 11px 9px; font-size: 12px; }
 .setting-help { font-size: 11px !important; color: #aebdad !important; line-height: 1.4 !important; margin: 7px 0 0; }
 .setting-label { margin-top: 16px; }
