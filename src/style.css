@@ -100,8 +100,6 @@ a { color: #d9bb78; }
 .pgn-panel { border-top: 1px solid #ffffff20; padding-top: 17px; }
 .pgn-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
 .pgn-actions .button { min-width: 0; }
-#copy-feedback { display: block; color: #bdcabb; font-size: 11px; margin-top: 8px; }
-#copy-feedback:empty { display: none; }
 .evaluation-panel { margin-bottom: 20px; }
 .review-panel { border-top: 1px solid #ffffff20; margin-top: 20px; padding-top: 17px; }
 .review-progress { color: #bdcabb; font-size: 11px; line-height: 1.5; }

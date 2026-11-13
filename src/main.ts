@@ -82,7 +82,7 @@ async function detectMateOpportunity(current: TrainingSession, result: SearchRes
   if (!reply) return
   current.opportunities.push({ fen: last.before, ply, cpuMove: toUci(last), suggestedReply: reply, estimatedLossCp: 0, mate: true, source: 'discovered' })
   sounds.playOpportunity()
-  render()
+  refreshReview(current)
 }
 
 async function analyzeInBackground(current: TrainingSession, token: number): Promise<void> {
@@ -100,7 +100,7 @@ async function analyzeInBackground(current: TrainingSession, token: number): Pro
         result = await analysisEngine.search(fen, milliseconds, 2)
         if (!canAnalyzeInBackground(current, token)) return
         reviewCache.store(fen, milliseconds, 2, result)
-        if (current.completed) refreshReview(current)
+        refreshReview(current)
       }
       if (index === positions.length - 1 && !current.completed) await detectMateOpportunity(current, result, token)
     }
@@ -211,7 +211,7 @@ function shuffledMoves(moves: string[]): string[] {
 
 async function evaluateVisiblePosition(): Promise<void> {
   const current = session
-  if (!current || !element<HTMLInputElement>('#evaluation-toggle').checked || review) return
+  if (!current || !element<HTMLInputElement>('#evaluation-toggle').checked || current.completed) return
   const fen = positionAt(positionPly()).fen()
   if (evaluationCache.has(fen)) {
     evaluationToken += 1
@@ -231,7 +231,7 @@ async function evaluateVisiblePosition(): Promise<void> {
   renderReview()
   try {
     const result = await evaluationEngine.search(fen, 350)
-    if (token !== evaluationToken || current !== session || review || !element<HTMLInputElement>('#evaluation-toggle').checked) return
+    if (token !== evaluationToken || current !== session || current.completed || !element<HTMLInputElement>('#evaluation-toggle').checked) return
     const best = result.lines.find((line) => line.rank === 1)
     const score = best ? scoreForWhite(best.score, result.rootTurn) : null
     evaluationCache.set(fen, score)
@@ -274,7 +274,8 @@ const board = new BoardView(element('#board-container'), (input) => {
     clearHint()
     sounds.playAfterMove(session.chess)
   }
-  render()
+  if (move) refreshReview(session)
+  else render()
   if (move) void evaluateVisiblePosition()
   if (move) {
     if (session.completed) showReview()
@@ -301,7 +302,7 @@ function clearLinePreview(): void {
 }
 
 function previewSuggestedLine(event: PointerEvent): void {
-  if (!session || !review) return
+  if (!session?.completed || !review) return
   if (linePreviewTimer !== null) window.clearTimeout(linePreviewTimer)
   linePreviewTimer = null
   const ply = positionPly()
@@ -506,7 +507,7 @@ function refreshReview(current: TrainingSession): void {
     return { bestMove: null, lines: [], rootTurn: fen.split(' ')[1] === 'b' ? 'b' : 'w' }
   })
   review = buildReview(current.chess.history({ verbose: true }), results, current.opportunities)
-  if (complete && !reviewReported) {
+  if (current.completed && complete && !reviewReported) {
     reviewReported = true
     const actualOpening = classifyGame(current.chess, openings)
     console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ${positions.length} positions analyzed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
@@ -592,13 +593,14 @@ function renderReview(): void {
   const total = session?.chess.history().length ?? 0
   const position = positionPly()
   const liveEnabled = element<HTMLInputElement>('#evaluation-toggle').checked
+  const visibleReview = session?.completed ? review : null
   element<HTMLElement>('#review-progress').textContent = liveEnabled && evaluationError ? evaluationError : liveEnabled && evaluating ? 'Evaluating position…' : ''
   const fen = positionAt(position).fen()
-  const score = review
-    ? (position === 0 ? review.initialScore : review.entries[position - 1]?.whiteScore ?? null)
+  const score = visibleReview
+    ? (position === 0 ? visibleReview.initialScore : visibleReview.entries[position - 1]?.whiteScore ?? null)
     : liveEnabled ? liveEvaluation?.score ?? null : null
-  const activeEvaluation = Boolean(review || liveEnabled && session)
-  const staleEvaluation = Boolean(liveEnabled && !review && liveEvaluation && liveEvaluation.fen !== fen)
+  const activeEvaluation = Boolean(visibleReview || liveEnabled && session)
+  const staleEvaluation = Boolean(liveEnabled && !visibleReview && liveEvaluation && liveEvaluation.fen !== fen)
   const fill = element<HTMLElement>('#eval-white')
   fill.hidden = !activeEvaluation
   fill.style.height = `${whiteShare(score)}%`
@@ -608,7 +610,7 @@ function renderReview(): void {
   element<HTMLButtonElement>('#review-prev').disabled = position === 0
   element<HTMLButtonElement>('#review-next').disabled = position >= total
   const detail = element<HTMLElement>('#review-detail')
-  const entry = review?.entries[position - 1]
+  const entry = visibleReview?.entries[position - 1]
   detail.textContent = entry?.bestLine ?? ''
   detail.title = entry?.bestLine ?? ''
   detail.setAttribute('aria-label', entry?.bestLine ? `Suggested line: ${entry.bestLine}` : 'No suggested line')
@@ -662,12 +664,13 @@ function render(): void {
         button.type = 'button'
         button.dataset.ply = String(ply)
         const entry = review?.entries[ply - 1]
+        const opportunity = entry?.opportunity || session?.opportunities.some((candidate) => candidate.ply === index)
         const mark = entry ? moveAnnotation(entry) : ''
         const annotationLabel = { '': '', '!': 'strong move', '!!': 'exceptional move', '?': 'mistake', '??': 'blunder' }[mark]
         button.textContent = `${moves[index]}${mark}`
         button.setAttribute('aria-current', String(position === ply))
-        button.setAttribute('aria-label', `${Math.floor(absolute / 2) + 1}${offset === 0 ? '.' : '...'} ${moves[index]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? annotationLabel ? `, ${annotationLabel}` : '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
-        if (entry?.opportunity) button.classList.add('generated-opportunity')
+        button.setAttribute('aria-label', `${Math.floor(absolute / 2) + 1}${offset === 0 ? '.' : '...'} ${moves[index]}${opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? annotationLabel ? `, ${annotationLabel}` : '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
+        if (opportunity) button.classList.add('generated-opportunity')
         button.addEventListener('click', () => navigateTo(ply))
         row.append(button)
       }
@@ -821,10 +824,8 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async () =>
   const black = session.playerColor === 'b' ? 'Player' : 'Computer'
   const resultOverride = session.finishReason === 'resigned' ? (session.playerColor === 'w' ? '0-1' : '1-0') : undefined
   const pgn = exportPgn(session.chess, white, black, session.openingReached ? { name: session.opening.name, eco: session.opening.eco } : undefined, resultOverride)
-  const feedback = element<HTMLElement>('#copy-feedback')
   try {
     await navigator.clipboard.writeText(pgn)
-    feedback.textContent = 'PGN copied.'
   } catch {
     const temporary = document.createElement('textarea')
     temporary.value = pgn
@@ -835,9 +836,8 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async () =>
     let copied = false
     try { copied = document.execCommand('copy') } catch { /* Report the copy failure below. */ }
     temporary.remove()
-    feedback.textContent = copied ? 'PGN copied.' : 'Could not copy PGN. Check clipboard permissions.'
+    if (!copied) console.warn('[Chess Trap Board] Could not copy PGN. Check clipboard permissions.')
   }
-  window.setTimeout(() => { feedback.textContent = '' }, 2500)
 })
 element<HTMLButtonElement>('#hint-button').addEventListener('click', () => void revealHint())
 element<HTMLElement>('#review-detail').addEventListener('pointerenter', previewSuggestedLine)
