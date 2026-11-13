@@ -274,7 +274,7 @@ const board = new BoardView(element('#board-container'), (input) => {
     clearHint()
     sounds.playAfterMove(session.chess)
   }
-  if (move) refreshReview(session)
+  if (move) refreshReview(session, true)
   else render()
   if (move) void evaluateVisiblePosition()
   if (move) {
@@ -493,7 +493,7 @@ async function runCpu(): Promise<void> {
   }
 }
 
-function refreshReview(current: TrainingSession): void {
+function refreshReview(current: TrainingSession, redrawBoard = false): void {
   const moveList = element<HTMLDivElement>('#move-list')
   const scrollTop = moveList.scrollTop
   const focusedPly = moveList.contains(document.activeElement) && document.activeElement instanceof HTMLButtonElement
@@ -512,7 +512,7 @@ function refreshReview(current: TrainingSession): void {
     const actualOpening = classifyGame(current.chess, openings)
     console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ${positions.length} positions analyzed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
   }
-  render()
+  render(redrawBoard)
   moveList.scrollTop = scrollTop
   if (focusedPly) moveList.querySelector<HTMLButtonElement>(`button[data-ply="${focusedPly}"]`)?.focus({ preventScroll: true })
 }
@@ -616,13 +616,13 @@ function renderReview(): void {
   detail.setAttribute('aria-label', entry?.bestLine ? `Suggested line: ${entry.bestLine}` : 'No suggested line')
 }
 
-function render(): void {
+function render(redrawBoard = true): void {
   const chess = session?.chess ?? previewChess
   const position = positionPly()
   const visiblePosition = positionAt(position)
   const viewingHistory = Boolean(session && position < chess.history().length)
   const opportunityNow = Boolean(session?.isPlayerTurn && session.opportunities.at(-1)?.ply === chess.history().length - 1)
-  renderBoard(visiblePosition, viewingHistory)
+  if (redrawBoard) renderBoard(visiblePosition, viewingHistory)
   element<HTMLElement>('#status').textContent = viewingHistory
     ? position === 0 ? 'Viewing starting position' : `Viewing move ${position} of ${chess.history().length}`
     : session?.completed
