@@ -1,6 +1,7 @@
 import { Chess, type Color, type Move } from 'chess.js'
 import { tryMove, type MoveInput } from './chess'
 import { fromUci, toUci, type Opening } from './openings'
+import type { GeneratedOpportunity } from './traps'
 
 export type Mode = 'memorize' | 'traps'
 
@@ -14,6 +15,7 @@ export class TrainingSession {
   completed = false
   feedback = ''
   finishReason: 'resigned' | 'stopped' | null = null
+  readonly opportunities: GeneratedOpportunity[] = []
 
   constructor(opening: Opening, mode: Mode, playerColor: Color) {
     this.opening = opening

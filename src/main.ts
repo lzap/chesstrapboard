@@ -4,10 +4,12 @@ import { exportPgn, gameStatus } from './chess'
 import { EngineClient } from './engine'
 import { fromUci, loadOpenings, openingSan, searchOpenings, toUci, type Opening } from './openings'
 import { TrainingSession, type Mode } from './session'
+import { findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
 const element = <T extends HTMLElement>(selector: string): T => document.querySelector<T>(selector)!
 const previewChess = new Chess()
+const preferencesKey = 'chess-trap-board-preferences-v1'
 let openings: Opening[] = []
 let selectedOpening: Opening | null = null
 let session: TrainingSession | null = null
@@ -19,6 +21,36 @@ let thinking = false
 let engineError = false
 let generation = 0
 const engine = new EngineClient()
+
+function savePreferences(): void {
+  try {
+    localStorage.setItem(preferencesKey, JSON.stringify({
+      mode, playerColor,
+      opening: selectedOpening ? [selectedOpening.eco, selectedOpening.name] : null,
+      hint: element<HTMLInputElement>('#hint-toggle').checked,
+      difficulty: element<HTMLSelectElement>('#difficulty').value,
+      frequency: element<HTMLSelectElement>('#mistake-frequency').value,
+      size: element<HTMLSelectElement>('#mistake-size').value,
+    }))
+  } catch { /* Preferences remain usable for this session. */ }
+}
+
+function restorePreferences(): [string, string] | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? '{}') as Record<string, unknown>
+    if (saved.mode === 'traps') mode = 'traps'
+    if (saved.playerColor === 'b') playerColor = 'b'
+    orientation = playerColor
+    element<HTMLInputElement>(`input[name="side"][value="${playerColor}"]`).checked = true
+    element<HTMLInputElement>('#hint-toggle').checked = saved.hint === true
+    for (const [id, value] of [['#difficulty', saved.difficulty], ['#mistake-frequency', saved.frequency], ['#mistake-size', saved.size]] as const) {
+      const select = element<HTMLSelectElement>(id)
+      if (typeof value === 'string' && [...select.options].some((option) => option.value === value)) select.value = value
+    }
+    if (Array.isArray(saved.opening) && saved.opening.length === 2 && saved.opening.every((value) => typeof value === 'string')) return saved.opening as [string, string]
+  } catch { /* Use defaults when storage is unavailable or invalid. */ }
+  return null
+}
 
 const board = new BoardView(element('#board-container'), (input) => {
   if (!session) return
@@ -51,10 +83,29 @@ async function runCpu(): Promise<void> {
   engineError = false
   render()
   try {
-    const result = await engine.search(current.chess.fen(), difficultyBudget())
+    const fen = current.chess.fen()
+    const ply = current.chess.history().length
+    const lastOpportunity = current.opportunities.at(-1)
+    const eligible = (current.openingReached || !current.bookActive)
+      && ply <= Math.min(36, Math.max(20, current.opening.moves.length + 10))
+      && current.opportunities.length < 3
+      && (!lastOpportunity || ply - lastOpportunity.ply >= 6)
+    const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
+    let result
+    let candidate = null
+    if (eligible && shouldAttemptMistake(frequency, Math.random())) {
+      const shallow = await engine.search(fen, Math.max(180, Math.floor(difficultyBudget() / 2)), 5)
+      if (token !== generation || current !== session) return
+      result = await engine.search(fen, Math.max(950, difficultyBudget()), 6)
+      candidate = findCandidateMistake(fen, shallow, result, element<HTMLSelectElement>('#mistake-size').value as MistakeSize)
+    } else {
+      result = await engine.search(fen, difficultyBudget())
+    }
     if (token !== generation || current !== session) return
     thinking = false
-    if (!result.bestMove || !current.playCpu(fromUci(result.bestMove))) throw new Error('Engine did not return a legal move')
+    const chosenMove = candidate?.move ?? result.bestMove
+    if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
+    if (candidate) current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
     render()
   } catch (error) {
     if (token !== generation || current !== session) return
@@ -90,6 +141,7 @@ function renderOpeningResults(): void {
       invalidateGame()
       selectedOpening = opening
       session = null
+      savePreferences()
       renderOpeningSelection()
       renderOpeningResults()
       render()
@@ -198,6 +250,7 @@ for (const [name, id] of [['memorize', '#memorize-mode'], ['traps', '#traps-mode
     invalidateGame()
     mode = name
     session = null
+    savePreferences()
     renderOpeningSelection()
     render()
   })
@@ -224,10 +277,12 @@ document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio
   playerColor = radio.value as Color
   session = null
   orientation = playerColor
+  savePreferences()
   renderOpeningSelection()
   render()
 }))
-element<HTMLInputElement>('#hint-toggle').addEventListener('change', render)
+element<HTMLInputElement>('#hint-toggle').addEventListener('change', () => { savePreferences(); render() })
+for (const id of ['#difficulty', '#mistake-frequency', '#mistake-size']) element<HTMLSelectElement>(id).addEventListener('change', savePreferences)
 element<HTMLButtonElement>('#copy-button').addEventListener('click', async (event) => {
   const button = event.currentTarget as HTMLButtonElement
   const textarea = element<HTMLTextAreaElement>('#pgn')
@@ -241,10 +296,12 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async (even
   }
 })
 
+const savedOpening = restorePreferences()
 render()
 loadOpenings().then((loaded) => {
   openings = loaded
-  selectedOpening = openings.find((opening) => opening.name === 'Italian Game') ?? openings[0]
+  selectedOpening = (savedOpening && openings.find((opening) => opening.eco === savedOpening[0] && opening.name === savedOpening[1]))
+    || openings.find((opening) => opening.name === 'Italian Game') || openings[0]
   renderOpeningResults()
   renderOpeningSelection()
   render()

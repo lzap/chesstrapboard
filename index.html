@@ -31,6 +31,11 @@
             <label class="field-label" for="difficulty">Computer difficulty</label>
             <select id="difficulty"><option value="beginner">Beginner · quicker moves</option><option value="intermediate" selected>Intermediate</option><option value="strong">Strong · longer thinking</option></select>
             <p class="setting-help">Difficulty changes the engine's thinking time. It is not a measured Elo rating.</p>
+            <label class="field-label setting-label" for="mistake-frequency">Deliberate mistake attempts</label>
+            <select id="mistake-frequency"><option value="off">Off</option><option value="rare">Rare · 10% of eligible turns</option><option value="sometimes" selected>Sometimes · 25%</option><option value="often">Often · 45%</option></select>
+            <p class="setting-help">The computer plays normally when no suitable mistake is found. Attempts are spaced apart.</p>
+            <label class="field-label setting-label" for="mistake-size">Opportunity size</label>
+            <select id="mistake-size"><option value="mild">Mild</option><option value="medium" selected>Medium</option><option value="large">Large</option></select>
           </div>
           <button type="button" id="start-button" class="button button-primary start-button" disabled>Start practice</button>
           <p id="feedback" class="feedback" role="status" aria-live="polite">Choose an opening to begin.</p>
