@@ -1,7 +1,7 @@
 # Project instructions
 
 - Keep `README.md`, this file, and `THIRD_PARTY_NOTICES.md` aligned with every feature or dependency change.
-- Keep the application fully static. GitHub Pages hosts the built site at `/chesstrapboard/`; runtime assets come from this repository.
+- Keep the application fully static. GitHub Pages hosts the built site at `/chesstrapboard/` on `https://lukas.zapletalovi.com`; runtime assets come from this repository.
 - Maintain two clearly separate modes: Memorize lines corrects deviations immediately and ends with the selected line; Explore traps allows a full game and shows evaluations only afterward.
 - Keep CPU difficulty separate from the frequency and size of deliberate mistake attempts. Validate generated candidate moves and replies with `chess.js`; fall back to a normal move when no candidate qualifies.
 - Keep Lichess opening source TSV and deterministic, browser-ready processed data in Git. Data updates are explicit; CI verifies the processed files match their source.
