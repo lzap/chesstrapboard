@@ -106,7 +106,6 @@ a { color: #d9bb78; }
 .review-panel { border-top: 1px solid #ffffff20; margin-top: 20px; padding-top: 17px; }
 .review-progress { color: #bdcabb; font-size: 11px; line-height: 1.5; }
 .review-progress:empty { display: none; }
-.review-panel progress { width: 100%; height: 9px; accent-color: #d9bb78; }
 .evaluation { display: flex; align-items: center; gap: 14px; border: 1px solid #ffffff24; background: #17231b; border-radius: 9px; padding: 11px; margin: 12px 0; }
 .eval-track { width: 24px; height: 92px; flex: 0 0 24px; background: #303832; border: 1px solid #9cae9b; border-radius: 3px; display: flex; align-items: end; overflow: hidden; }
 #eval-white { width: 100%; height: 50%; background: #eee9d8; transition: height .2s; }

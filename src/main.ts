@@ -1,9 +1,9 @@
 import { Chess, type Color, type Square } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
-import { EngineClient, scoreForWhite, type EngineScore } from './engine'
+import { EngineClient, scoreForWhite, type EngineScore, type SearchResult } from './engine'
 import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
-import { analyzeGame, formatScore, moveAnnotation, whiteShare, type GameReview } from './review'
+import { buildReview, formatScore, moveAnnotation, reviewBudget, reviewPositions, ReviewSearchCache, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
 import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
@@ -23,10 +23,7 @@ let thinking = false
 let engineError = false
 let generation = 0
 let review: GameReview | null = null
-let reviewing = false
-let reviewDone = 0
-let reviewTotal = 0
-let reviewError = ''
+let reviewReported = false
 let viewPly: number | null = null
 let liveEvaluation: { fen: string; score: EngineScore | null } | null = null
 let evaluating = false
@@ -39,9 +36,57 @@ let bookHints: { fen: string; moves: string[]; index: number } | null = null
 let linePreview: { session: TrainingSession; ply: number; positions: Chess[]; step: number } | null = null
 let linePreviewTimer: number | null = null
 const evaluationCache = new Map<string, EngineScore | null>()
+const reviewCache = new ReviewSearchCache()
 const engine = new EngineClient()
 const evaluationEngine = new EngineClient()
+const analysisEngine = new EngineClient()
 const sounds = new GameSounds()
+let backgroundTimer: number | null = null
+let backgroundToken = 0
+let backgroundRunning = false
+
+function stopBackground(): void {
+  backgroundToken += 1
+  if (backgroundTimer !== null) window.clearTimeout(backgroundTimer)
+  backgroundTimer = null
+  if (backgroundRunning) analysisEngine.terminate()
+}
+
+function canAnalyzeInBackground(current: TrainingSession, token: number): boolean {
+  return token === backgroundToken && current === session && (current.isPlayerTurn || current.completed) && !thinking && !evaluating && !hintSearching && document.visibilityState === 'visible'
+}
+
+function scheduleBackground(): void {
+  const current = session
+  if (!current || backgroundTimer !== null || backgroundRunning || !canAnalyzeInBackground(current, backgroundToken)) return
+  const token = backgroundToken
+  backgroundTimer = window.setTimeout(() => {
+    backgroundTimer = null
+    if (canAnalyzeInBackground(current, token)) void analyzeInBackground(current, token)
+  }, 300)
+}
+
+async function analyzeInBackground(current: TrainingSession, token: number): Promise<void> {
+  backgroundRunning = true
+  try {
+    const positions = reviewPositions(current.chess)
+    for (let index = 0; index < positions.length; index += 1) {
+      if (!canAnalyzeInBackground(current, token)) return
+      const fen = positions[index]
+      const milliseconds = reviewBudget(index, current.opportunities, !current.completed)
+      if (reviewCache.get(fen, milliseconds, 2)) continue
+      const result = await analysisEngine.search(fen, milliseconds, 2)
+      if (!canAnalyzeInBackground(current, token)) return
+      reviewCache.store(fen, milliseconds, 2, result)
+      if (current.completed) refreshReview(current)
+    }
+  } catch (error) {
+    if (canAnalyzeInBackground(current, token)) console.warn('[Chess Trap Board] Background analysis unavailable:', error)
+  } finally {
+    backgroundRunning = false
+    if (token !== backgroundToken) scheduleBackground()
+  }
+}
 
 function savePreferences(): void {
   try {
@@ -136,8 +181,10 @@ async function evaluateVisiblePosition(): Promise<void> {
     evaluating = false
     evaluationError = ''
     renderReview()
+    scheduleBackground()
     return
   }
+  stopBackground()
   const token = ++evaluationToken
   evaluationEngine.terminate()
   evaluating = true
@@ -152,12 +199,14 @@ async function evaluateVisiblePosition(): Promise<void> {
     liveEvaluation = { fen, score }
     evaluating = false
     renderReview()
+    scheduleBackground()
   } catch (error) {
     if (token !== evaluationToken || current !== session) return
     evaluating = false
     liveEvaluation = null
     evaluationError = error instanceof Error ? error.message : 'Evaluation unavailable'
     renderReview()
+    scheduleBackground()
   }
 }
 
@@ -182,13 +231,14 @@ const board = new BoardView(element('#board-container'), (input) => {
   }
   const move = session.playPlayer(input)
   if (move) {
+    stopBackground()
     clearHint()
     sounds.playAfterMove(session.chess)
   }
   render()
   if (move) void evaluateVisiblePosition()
   if (move) {
-    if (session.completed) void runReview()
+    if (session.completed) showReview()
     else void runCpu()
   }
 }, (square: Square) => {
@@ -257,7 +307,10 @@ function restoreSuggestedLine(): void {
   }, 180)
 }
 
-function invalidateGame(): void {
+function invalidateGame(clearReviewCache = true): void {
+  stopBackground()
+  analysisEngine.terminate()
+  if (clearReviewCache) reviewCache.clear()
   clearHint()
   clearLinePreview()
   generation += 1
@@ -266,11 +319,8 @@ function invalidateGame(): void {
   evaluationCache.clear()
   thinking = false
   engineError = false
-  reviewing = false
   review = null
-  reviewDone = 0
-  reviewTotal = 0
-  reviewError = ''
+  reviewReported = false
   viewPly = null
 }
 
@@ -281,7 +331,7 @@ function difficultyBudget(): number {
 
 async function revealHint(): Promise<void> {
   const current = session
-  if (!current || hintSearching || thinking || reviewing) return
+  if (!current || hintSearching || thinking) return
   const position = positionAt(positionPly())
   const viewingHistory = positionPly() < current.chess.history().length
   if (position.isGameOver() || (!viewingHistory && !current.isPlayerTurn)) return
@@ -301,6 +351,7 @@ async function revealHint(): Promise<void> {
   }
   const token = ++hintToken
   hintSearching = true
+  stopBackground()
   render()
   try {
     const result = await engine.search(fen, Math.max(1200, difficultyBudget()))
@@ -310,11 +361,13 @@ async function revealHint(): Promise<void> {
     hintMove = { from: move.from, to: move.to }
     hintSearching = false
     render()
+    scheduleBackground()
   } catch (error) {
     if (token !== hintToken || current !== session) return
     hintSearching = false
     console.warn('[Chess Trap Board] Hint unavailable:', error)
     render()
+    scheduleBackground()
   }
 }
 
@@ -332,7 +385,8 @@ async function runCpu(): Promise<void> {
     sounds.playAfterMove(current.chess)
     render()
     void evaluateVisiblePosition()
-    if (current.completed) void runReview()
+    if (current.completed) showReview()
+    else scheduleBackground()
     return
   }
   const token = generation
@@ -363,7 +417,8 @@ async function runCpu(): Promise<void> {
       sounds.playAfterMove(current.chess)
       render()
       void evaluateVisiblePosition()
-      if (current.completed) void runReview()
+      if (current.completed) showReview()
+      else scheduleBackground()
       return
     }
     result ??= await engine.search(fen, difficultyBudget(), 2)
@@ -377,7 +432,8 @@ async function runCpu(): Promise<void> {
     sounds.playAfterMove(current.chess, Boolean(candidate))
     render()
     void evaluateVisiblePosition()
-    if (current.completed) void runReview()
+    if (current.completed) showReview()
+    else scheduleBackground()
   } catch (error) {
     if (token !== generation || current !== session) return
     thinking = false
@@ -385,7 +441,8 @@ async function runCpu(): Promise<void> {
       sounds.playAfterMove(current.chess)
       render()
       void evaluateVisiblePosition()
-      if (current.completed) void runReview()
+      if (current.completed) showReview()
+      else scheduleBackground()
       return
     }
     engineError = true
@@ -395,43 +452,38 @@ async function runCpu(): Promise<void> {
   }
 }
 
-async function runReview(): Promise<void> {
+function refreshReview(current: TrainingSession): void {
+  const moveList = element<HTMLDivElement>('#move-list')
+  const scrollTop = moveList.scrollTop
+  const focusedPly = moveList.contains(document.activeElement) && document.activeElement instanceof HTMLButtonElement
+    ? document.activeElement.dataset.ply : null
+  const positions = reviewPositions(current.chess)
+  let complete = true
+  const results = positions.map((fen, index): SearchResult => {
+    const cached = reviewCache.get(fen, reviewBudget(index, current.opportunities), 2)
+    if (cached) return cached
+    complete = false
+    return { bestMove: null, lines: [], rootTurn: fen.split(' ')[1] === 'b' ? 'b' : 'w' }
+  })
+  review = buildReview(current.chess.history({ verbose: true }), results, current.opportunities)
+  if (complete && !reviewReported) {
+    reviewReported = true
+    const actualOpening = classifyGame(current.chess, openings)
+    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ${positions.length} positions analyzed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
+  }
+  render()
+  moveList.scrollTop = scrollTop
+  if (focusedPly) moveList.querySelector<HTMLButtonElement>(`button[data-ply="${focusedPly}"]`)?.focus({ preventScroll: true })
+}
+
+function showReview(): void {
   const current = session
   if (!current || !current.completed) return
-  const token = generation
+  stopBackground()
   clearLinePreview()
   cancelEvaluation(false)
-  reviewing = true
-  review = null
-  reviewError = ''
-  reviewDone = 0
-  reviewTotal = current.chess.history().length + 1
-  render()
-  try {
-    const result = await analyzeGame(
-      current.chess,
-      (fen, milliseconds, multiPv) => engine.search(fen, milliseconds, multiPv),
-      current.opportunities,
-      (done, total) => {
-        if (token !== generation || current !== session) return
-        reviewDone = done
-        reviewTotal = total
-        renderReview()
-      },
-      () => token !== generation || current !== session,
-    )
-    if (token !== generation || current !== session) return
-    review = result
-    reviewing = false
-    const actualOpening = classifyGame(current.chess, openings)
-    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${result.generated} generated; ${result.used} found, ${result.missed} missed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
-    render()
-  } catch (error) {
-    if (token !== generation || current !== session) return
-    reviewing = false
-    reviewError = error instanceof Error ? error.message : 'Review failed'
-    render()
-  }
+  refreshReview(current)
+  scheduleBackground()
 }
 
 function renderOpeningResults(): void {
@@ -497,13 +549,7 @@ function renderReview(): void {
   const total = session?.chess.history().length ?? 0
   const position = positionPly()
   const liveEnabled = element<HTMLInputElement>('#evaluation-toggle').checked
-  element<HTMLElement>('#review-progress').textContent = reviewing
-    ? `Analyzing ${reviewDone} of ${reviewTotal} positions…`
-    : reviewError || (liveEnabled && evaluationError ? evaluationError : liveEnabled && evaluating ? 'Evaluating position…' : '')
-  const meter = element<HTMLProgressElement>('#review-meter')
-  meter.hidden = !reviewing
-  meter.value = reviewTotal ? Math.round(reviewDone / reviewTotal * 100) : 0
-  element<HTMLButtonElement>('#cancel-review').hidden = !reviewing
+  element<HTMLElement>('#review-progress').textContent = liveEnabled && evaluationError ? evaluationError : liveEnabled && evaluating ? 'Evaluating position…' : ''
   const fen = positionAt(position).fen()
   const score = review
     ? (position === 0 ? review.initialScore : review.entries[position - 1]?.whiteScore ?? null)
@@ -513,7 +559,7 @@ function renderReview(): void {
   const fill = element<HTMLElement>('#eval-white')
   fill.hidden = !activeEvaluation
   fill.style.height = `${whiteShare(score)}%`
-  element<HTMLElement>('#eval-label').textContent = score ? formatScore(score) : activeEvaluation ? evaluating || reviewing ? '…' : '—' : ''
+  element<HTMLElement>('#eval-label').textContent = score ? formatScore(score) : activeEvaluation ? evaluating ? '…' : '—' : ''
   element<HTMLElement>('.eval-track').setAttribute('aria-label', score ? `${staleEvaluation ? 'Previous position evaluation while updating' : 'Evaluation after selected move'}: ${formatScore(score)} from White's perspective` : activeEvaluation ? 'Evaluation pending or unavailable' : 'Evaluation hidden')
   element<HTMLElement>('#review-position').textContent = position === 0 ? 'Starting position' : `Move ${position} of ${total}`
   element<HTMLButtonElement>('#review-prev').disabled = position === 0
@@ -543,7 +589,7 @@ function render(): void {
   boardHint.textContent = viewingHistory ? 'History' : showOpportunityCue
     ? 'Possible opportunity · find your best reply'
     : session ? session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game' : session.bookActive ? 'Following opening' : session.hasBookContinuation ? 'Following database' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
-  element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
+  element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
   const moveList = element<HTMLDivElement>('#move-list')
@@ -594,7 +640,7 @@ function render(): void {
   }
   element<HTMLButtonElement>('#copy-button').disabled = !session || moves.length === 0
   const hintButton = element<HTMLButtonElement>('#hint-button')
-  hintButton.disabled = !session || thinking || reviewing || hintSearching || visiblePosition.isGameOver() || (!viewingHistory && !session.isPlayerTurn)
+  hintButton.disabled = !session || thinking || hintSearching || visiblePosition.isGameOver() || (!viewingHistory && !session.isPlayerTurn)
   hintButton.textContent = hintSearching ? 'Thinking…' : bookHints && hintMove ? `Hint ${bookHints.index + 1}/${bookHints.moves.length}` : hintMove ? 'Hide hint' : 'Hint'
   if (bookHints && hintMove) {
     hintButton.removeAttribute('aria-pressed')
@@ -603,7 +649,7 @@ function render(): void {
     hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
     hintButton.removeAttribute('aria-label')
   }
-  element<HTMLButtonElement>('#finish-button').disabled = !session || reviewing || session.completed && Boolean(review)
+  element<HTMLButtonElement>('#finish-button').disabled = !session || session.completed
   element<HTMLButtonElement>('#take-back-button').disabled = !session?.canTakeBack
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = openings.length === 0
@@ -631,6 +677,7 @@ function startGame(initialMove?: MoveInput, startAtOpening = false): void {
   render()
   void evaluateVisiblePosition()
   void runCpu()
+  scheduleBackground()
 }
 
 let lastWheelStep = 0
@@ -663,33 +710,24 @@ element<HTMLButtonElement>('#new-opening-button').addEventListener('click', () =
 element<HTMLButtonElement>('#take-back-button').addEventListener('click', () => {
   if (!session?.canTakeBack) return
   const current = session
-  invalidateGame()
+  invalidateGame(false)
   current.takeBack()
   render()
   void evaluateVisiblePosition()
+  scheduleBackground()
 })
 element<HTMLButtonElement>('#flip-button').addEventListener('click', () => {
   orientation = orientation === 'w' ? 'b' : 'w'
   render()
 })
 element<HTMLButtonElement>('#finish-button').addEventListener('click', () => {
-  if (session?.completed) {
-    void runReview()
-    return
-  }
-  invalidateGame()
+  if (!session || session.completed) return
+  invalidateGame(false)
   session?.finish('stopped')
   render()
-  void runReview()
+  showReview()
 })
 element<HTMLButtonElement>('#retry-cpu-button').addEventListener('click', () => void runCpu())
-element<HTMLButtonElement>('#cancel-review').addEventListener('click', () => {
-  generation += 1
-  engine.stop()
-  reviewing = false
-  reviewError = 'Review cancelled.'
-  render()
-})
 element<HTMLButtonElement>('#review-prev').addEventListener('click', () => {
   navigateTo(positionPly() - 1)
 })
@@ -708,7 +746,11 @@ document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio
 element<HTMLInputElement>('#evaluation-toggle').addEventListener('change', () => {
   savePreferences()
   if (element<HTMLInputElement>('#evaluation-toggle').checked) void evaluateVisiblePosition()
-  else { cancelEvaluation(); renderReview() }
+  else { cancelEvaluation(); renderReview(); scheduleBackground() }
+})
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') stopBackground()
+  else scheduleBackground()
 })
 element<HTMLInputElement>('#sound-toggle').addEventListener('change', () => {
   sounds.moveEnabled = element<HTMLInputElement>('#sound-toggle').checked

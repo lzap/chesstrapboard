@@ -30,6 +30,43 @@ export interface GameReview {
   missed: number
 }
 
+interface CachedSearch {
+  result: SearchResult
+  milliseconds: number
+  multiPv: number
+}
+
+export class ReviewSearchCache {
+  private results = new Map<string, CachedSearch>()
+
+  get(fen: string, milliseconds: number, multiPv: number): SearchResult | null {
+    const cached = this.results.get(fen)
+    return cached && cached.milliseconds >= milliseconds && cached.multiPv >= multiPv ? cached.result : null
+  }
+
+  store(fen: string, milliseconds: number, multiPv: number, result: SearchResult): void {
+    const cached = this.results.get(fen)
+    if (!cached || milliseconds >= cached.milliseconds && multiPv >= cached.multiPv) {
+      this.results.set(fen, { result, milliseconds, multiPv })
+    }
+  }
+
+  clear(): void {
+    this.results.clear()
+  }
+}
+
+export function reviewPositions(chess: Chess): string[] {
+  const moves = chess.history({ verbose: true })
+  return [moves[0]?.before ?? chess.fen(), ...moves.map((move) => move.after)]
+}
+
+export function reviewBudget(index: number, opportunities: GeneratedOpportunity[], background = false): number {
+  const nearOpportunity = opportunities.some((opportunity) => index >= opportunity.ply && index <= opportunity.ply + 2)
+  if (nearOpportunity) return background ? 1200 : 850
+  return background ? 500 : 260
+}
+
 export function moveAnnotation(entry: Pick<ReviewEntry, 'annotation' | 'replyFound'>): Annotation {
   return entry.replyFound === undefined ? entry.annotation : entry.replyFound ? '!' : '?'
 }
@@ -133,25 +170,4 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
   }
   const initial = positions[0]?.lines.find((line) => line.rank === 1)
   return { initialScore: initial ? scoreForWhite(initial.score, positions[0].rootTurn) : null, entries, generated: opportunities.length, used, missed }
-}
-
-export async function analyzeGame(
-  chess: Chess,
-  search: (fen: string, milliseconds: number, multiPv: number) => Promise<SearchResult>,
-  opportunities: GeneratedOpportunity[],
-  onProgress: (done: number, total: number) => void,
-  cancelled: () => boolean,
-): Promise<GameReview> {
-  const moves = chess.history({ verbose: true })
-  const positions = [moves[0]?.before ?? chess.fen(), ...moves.map((move) => move.after)]
-  const results: SearchResult[] = new Array(positions.length)
-  for (let index = positions.length - 1; index >= 0; index -= 1) {
-    if (cancelled()) throw new Error('Review cancelled')
-    const fen = positions[index]
-    const shouldDeepen = opportunities.some((opportunity) => index === opportunity.ply || index === opportunity.ply + 1 || index === opportunity.ply + 2)
-    results[index] = await search(fen, shouldDeepen ? 850 : 260, 2)
-    onProgress(positions.length - index, positions.length)
-  }
-  if (cancelled()) throw new Error('Review cancelled')
-  return buildReview(moves, results, opportunities)
 }

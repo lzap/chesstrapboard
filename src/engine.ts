@@ -45,6 +45,7 @@ export class EngineClient {
   private ready: Promise<void> | null = null
   private readyResolve: (() => void) | null = null
   private readyReject: ((error: Error) => void) | null = null
+  private initTimer: number | null = null
   private pending: PendingSearch | null = null
   private queue: Promise<void> = Promise.resolve()
 
@@ -59,6 +60,7 @@ export class EngineClient {
   }
 
   terminate(): void {
+    this.clearInitTimer()
     this.worker?.terminate()
     this.worker = null
     this.ready = null
@@ -72,29 +74,39 @@ export class EngineClient {
     }
   }
 
+  private clearInitTimer(): void {
+    if (this.initTimer !== null) window.clearTimeout(this.initTimer)
+    this.initTimer = null
+  }
+
   private init(): Promise<void> {
     if (this.ready) return this.ready
+    const url = `${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`
+    let worker: Worker
+    try {
+      worker = new Worker(url)
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error('Engine Worker could not start'))
+    }
+    this.worker = worker
     this.ready = new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve
       this.readyReject = reject
-      const url = `${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`
-      try {
-        this.worker = new Worker(url)
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error('Engine Worker could not start'))
-        return
-      }
-      const timer = window.setTimeout(() => {
+      this.initTimer = window.setTimeout(() => {
+        this.initTimer = null
         this.worker?.terminate()
         this.worker = null
         this.ready = null
-        reject(new Error('Engine startup timed out'))
+        this.readyReject?.(new Error('Engine startup timed out'))
+        this.readyReject = null
+        this.readyResolve = null
       }, 20000)
-      this.worker.onmessage = (event: MessageEvent<string>) => {
+      worker.onmessage = (event: MessageEvent<string>) => {
+        if (this.worker !== worker) return
         for (const line of String(event.data).split(/\r?\n/)) {
           if (line === 'uciok') this.worker?.postMessage('isready')
           if (line === 'readyok') {
-            window.clearTimeout(timer)
+            this.clearInitTimer()
             this.readyResolve?.()
             this.readyResolve = null
             this.readyReject = null
@@ -102,9 +114,10 @@ export class EngineClient {
           this.handleSearchLine(line)
         }
       }
-      this.worker.onerror = () => {
+      worker.onerror = () => {
+        if (this.worker !== worker) return
         const failure = new Error('Engine Worker failed to load')
-        window.clearTimeout(timer)
+        this.clearInitTimer()
         this.readyReject?.(failure)
         if (this.pending) {
           window.clearTimeout(this.pending.timer)
@@ -116,7 +129,7 @@ export class EngineClient {
         this.worker = null
         this.ready = null
       }
-      this.worker.postMessage('uci')
+      worker.postMessage('uci')
     })
     return this.ready
   }

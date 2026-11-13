@@ -1,9 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
-import { analyzeGame, buildReview, formatScore, moveAnnotation, whiteShare } from './review'
+import { buildReview, formatScore, moveAnnotation, reviewBudget, reviewPositions, ReviewSearchCache, whiteShare } from './review'
 import type { SearchResult } from './engine'
 
 describe('postgame review', () => {
+  it('reuses bounded background searches and deepens opportunity positions', () => {
+    const cache = new ReviewSearchCache()
+    const result: SearchResult = { rootTurn: 'w', bestMove: 'e2e4', lines: [] }
+    const deeper: SearchResult = { rootTurn: 'w', bestMove: 'd2d4', lines: [] }
+    cache.store('fen', 500, 2, result)
+    expect(cache.get('fen', 260, 2)).toBe(result)
+    expect(cache.get('fen', 850, 2)).toBeNull()
+    expect(cache.get('fen', 260, 3)).toBeNull()
+    cache.store('fen', 1200, 2, deeper)
+    cache.store('fen', 260, 2, result)
+    expect(cache.get('fen', 850, 2)).toBe(deeper)
+    cache.clear()
+    expect(cache.get('fen', 260, 2)).toBeNull()
+
+    const opportunities = [{ fen: 'fen', ply: 4, cpuMove: 'e7e5', suggestedReply: 'e2e4', estimatedLossCp: 100 }]
+    expect(reviewBudget(3, opportunities)).toBe(260)
+    expect(reviewBudget(4, opportunities)).toBe(850)
+    expect(reviewBudget(6, opportunities, true)).toBe(1200)
+    expect(reviewBudget(7, opportunities, true)).toBe(500)
+  })
+
   it.each([
     { move: 'f3', before: 100, after: 0, second: null, mark: '' },
     { move: 'f3', before: 100, after: 100, second: null, mark: '?' },
@@ -105,35 +126,16 @@ describe('postgame review', () => {
     expect(buildReview(moves, positions, []).entries[0].bestLine).toBe('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6')
   })
 
-  it('searches backward while keeping evaluations attached to the right moves', async () => {
+  it('lists reached positions in move order for incremental review', () => {
     const chess = new Chess()
     chess.move('e4')
     chess.move('e5')
     const moves = chess.history({ verbose: true })
-    const fens = [moves[0].before, ...moves.map((move) => move.after)]
-    const searched: string[] = []
-    const progress: number[] = []
-    const multiPv: number[] = []
-    const review = await analyzeGame(chess, async (fen, _milliseconds, variations) => {
-      searched.push(fen)
-      multiPv.push(variations)
-      return { rootTurn: fen.split(' ')[1] as 'w' | 'b', bestMove: null, lines: [{ rank: 1, depth: 8, score: { kind: 'cp', value: (fens.indexOf(fen) + 1) * 10 }, moves: [] }] }
-    }, [], (done) => progress.push(done), () => false)
-    expect(searched).toEqual([...fens].reverse())
-    expect(progress).toEqual([1, 2, 3])
-    expect(multiPv).toEqual([2, 2, 2])
-    expect(review.initialScore).toEqual({ kind: 'cp', value: 10 })
-    expect(review.entries.map((entry) => entry.whiteScore)).toEqual([{ kind: 'cp', value: -20 }, { kind: 'cp', value: 30 }])
+    expect(reviewPositions(chess)).toEqual([moves[0].before, moves[0].after, moves[1].after])
   })
 
-  it('reviews the setup position when a game starts from an opening FEN without moves', async () => {
+  it('includes the setup position when a game starts from an opening FEN', () => {
     const chess = new Chess('r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3')
-    const searched: string[] = []
-    const review = await analyzeGame(chess, async (fen) => {
-      searched.push(fen)
-      return { rootTurn: 'b', bestMove: 'g8f6', lines: [{ rank: 1, depth: 8, score: { kind: 'cp', value: 0 }, moves: ['g8f6'] }] }
-    }, [], () => undefined, () => false)
-    expect(searched).toEqual([chess.fen()])
-    expect(review.entries).toEqual([])
+    expect(reviewPositions(chess)).toEqual([chess.fen()])
   })
 })
