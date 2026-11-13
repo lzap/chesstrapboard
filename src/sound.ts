@@ -1,3 +1,5 @@
+import type { Chess } from 'chess.js'
+
 /** Optional sounds synthesized locally with Web Audio. No audio files are loaded. */
 export class GameSounds {
   moveEnabled = true
@@ -9,6 +11,15 @@ export class GameSounds {
   activate(): void {
     if ((!this.moveEnabled && !this.opportunityEnabled) || this.volume <= 0) return
     try { this.audioContext() } catch { /* Audio is optional. */ }
+  }
+
+  playAfterMove(chess: Chess, opportunity = false): void {
+    if (chess.isCheckmate() || chess.isStalemate()) {
+      this.playOpportunity()
+      return
+    }
+    this.playMove()
+    if (opportunity) this.playOpportunity(this.moveEnabled ? 0.17 : 0)
   }
 
   playMove(): void {

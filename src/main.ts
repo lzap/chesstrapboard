@@ -183,7 +183,7 @@ const board = new BoardView(element('#board-container'), (input) => {
   const move = session.playPlayer(input)
   if (move) {
     clearHint()
-    sounds.playMove()
+    sounds.playAfterMove(session.chess)
   }
   render()
   if (move) void evaluateVisiblePosition()
@@ -328,7 +328,7 @@ async function runCpu(): Promise<void> {
     && shouldAttemptMistake(frequency, Math.random())
   if (attempt) current.recordOpportunityCheck(ply)
   if (!attempt && current.advanceBook()) {
-    sounds.playMove()
+    sounds.playAfterMove(current.chess)
     render()
     void evaluateVisiblePosition()
     if (current.completed) void runReview()
@@ -359,7 +359,7 @@ async function runCpu(): Promise<void> {
     if (token !== generation || current !== session) return
     if (!candidate && current.advanceBook()) {
       thinking = false
-      sounds.playMove()
+      sounds.playAfterMove(current.chess)
       render()
       void evaluateVisiblePosition()
       if (current.completed) void runReview()
@@ -373,8 +373,7 @@ async function runCpu(): Promise<void> {
     if (candidate) {
       current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
     }
-    sounds.playMove()
-    if (candidate) sounds.playOpportunity(sounds.moveEnabled ? 0.17 : 0)
+    sounds.playAfterMove(current.chess, Boolean(candidate))
     render()
     void evaluateVisiblePosition()
     if (current.completed) void runReview()
@@ -382,7 +381,7 @@ async function runCpu(): Promise<void> {
     if (token !== generation || current !== session) return
     thinking = false
     if (current.advanceBook()) {
-      sounds.playMove()
+      sounds.playAfterMove(current.chess)
       render()
       void evaluateVisiblePosition()
       if (current.completed) void runReview()
@@ -615,8 +614,8 @@ function startGame(initialMove?: MoveInput): void {
   session = new TrainingSession(opening, playerColor, openingBook)
   orientation = playerColor
   sounds.activate()
-  if (session.chess.history().length) sounds.playMove()
-  if (initialMove && session.playPlayer(initialMove)) sounds.playMove()
+  if (session.chess.history().length) sounds.playAfterMove(session.chess)
+  if (initialMove && session.playPlayer(initialMove)) sounds.playAfterMove(session.chess)
   renderOpeningSelection()
   render()
   void evaluateVisiblePosition()
