@@ -34,7 +34,15 @@ export async function loadOpenings(): Promise<Opening[]> {
 }
 
 export async function loadOpeningBook(): Promise<OpeningBook> {
-  const response = await fetch(`${import.meta.env.BASE_URL}data/book.json`)
+  return loadBook('book.json')
+}
+
+export async function loadCommonOpeningBook(): Promise<OpeningBook> {
+  return loadBook('common-book.json')
+}
+
+async function loadBook(filename: string): Promise<OpeningBook> {
+  const response = await fetch(`${import.meta.env.BASE_URL}data/${filename}`)
   if (!response.ok) throw new Error(`Opening book could not be loaded (${response.status})`)
   const file = await response.json() as BookFile
   if (file.version !== 1 || !Array.isArray(file.positions)) throw new Error('Opening book has an unsupported format')
@@ -94,12 +102,6 @@ export function fromUci(uci: string): MoveInput {
 
 export function toUci(move: { from: string; to: string; promotion?: string }): string {
   return `${move.from}${move.to}${move.promotion ?? ''}`
-}
-
-export function pickOpening(openings: Opening[], firstMove?: MoveInput, random = Math.random): Opening | null {
-  const matching = firstMove ? openings.filter((opening) => opening.moves[0] === toUci(firstMove)) : openings
-  const pool = matching.length ? matching : openings
-  return pool[Math.floor(random() * pool.length)] ?? null
 }
 
 export function openingSan(opening: Opening): string[] {

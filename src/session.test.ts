@@ -31,6 +31,32 @@ function bookFromLines(lines: string[][]): OpeningBook {
 }
 
 describe('opening-guided full game', () => {
+  it('uses the common book without locking an unselected game to a named line', () => {
+    const fullBook = bookFromLines([['e2e4', 'b7b5']])
+    const commonBook = bookFromLines([['e2e4', 'e7e5', 'g1f3', 'b8c6']])
+    const session = new TrainingSession(null, 'w', fullBook, false, commonBook)
+    expect(session.opening).toBeNull()
+    expect(session.bookActive).toBe(false)
+    expect(session.bookMovesAt(new Chess())).toEqual(['e2e4'])
+    expect(session.playPlayer({ from: 'e2', to: 'e4' })?.san).toBe('e4')
+    expect(session.bookMovesAt(session.chess)).toEqual(['e7e5'])
+    expect(session.advanceBook()?.san).toBe('e5')
+    expect(session.playPlayer({ from: 'g1', to: 'f3' })?.san).toBe('Nf3')
+    expect(session.advanceBook()?.san).toBe('Nc6')
+    expect(session.openingReached).toBe(false)
+    expect(session.takeBack()).toBe(true)
+    expect(session.chess.history()).toEqual(['e4', 'e5'])
+    expect(session.bookMovesAt(session.chess)).toEqual(['g1f3'])
+  })
+
+  it('lets the CPU start an unselected Black-side game from the common book', () => {
+    const commonBook = bookFromLines([['d2d4', 'd7d5']])
+    const session = new TrainingSession(null, 'b', emptyBook, false, commonBook)
+    expect(session.chess.history()).toEqual(['d4'])
+    expect(session.playPlayer({ from: 'd7', to: 'd5' })?.san).toBe('d5')
+    expect(session.openingReached).toBe(false)
+  })
+
   it('starts at the selected opening position with a fresh move history and PGN setup', () => {
     const session = new TrainingSession(italian, 'b', emptyBook, true)
     expect(positionKey(openingPosition(italian))).toBe(italian.position)

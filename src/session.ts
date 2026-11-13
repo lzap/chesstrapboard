@@ -5,11 +5,11 @@ import type { GeneratedOpportunity } from './traps'
 
 export class TrainingSession {
   readonly chess = new Chess()
-  readonly opening: Opening
+  readonly opening: Opening | null
   readonly playerColor: Color
   readonly initialFen: string
   readonly startingPly: number
-  bookActive = true
+  bookActive: boolean
   openingReached = false
   completed = false
   feedback = ''
@@ -17,12 +17,14 @@ export class TrainingSession {
   private opportunityCheckPlies: number[] = []
   readonly opportunities: GeneratedOpportunity[] = []
 
-  constructor(opening: Opening, playerColor: Color, private readonly book: OpeningBook, startAtOpening = false) {
+  constructor(opening: Opening | null, playerColor: Color, private readonly book: OpeningBook, startAtOpening = false,
+    private readonly commonBook: OpeningBook = book) {
     this.opening = opening
     this.playerColor = playerColor
-    this.startingPly = startAtOpening ? opening.moves.length : 0
-    this.initialFen = startAtOpening ? openingPosition(opening).fen() : this.chess.fen()
-    if (startAtOpening) {
+    this.bookActive = Boolean(opening)
+    this.startingPly = startAtOpening && opening ? opening.moves.length : 0
+    this.initialFen = startAtOpening && opening ? openingPosition(opening).fen() : this.chess.fen()
+    if (startAtOpening && opening) {
       this.chess.load(this.initialFen)
       this.bookActive = false
       this.openingReached = true
@@ -39,7 +41,7 @@ export class TrainingSession {
   }
 
   get nextBookMove(): string | undefined {
-    return this.bookActive ? this.opening.moves[this.absolutePly] : undefined
+    return this.bookActive ? this.opening?.moves[this.absolutePly] : undefined
   }
 
   get absolutePly(): number {
@@ -47,18 +49,20 @@ export class TrainingSession {
   }
 
   get hasBookContinuation(): boolean {
-    return Boolean(this.nextBookMove) || this.book.hasContinuation(this.chess)
+    return Boolean(this.nextBookMove) || this.activeBook.hasContinuation(this.chess)
   }
 
   get availableOpeningLength(): number {
-    return Math.max(this.opening.moves.length, this.book.longestLinePly(this.chess))
+    return Math.max(this.opening?.moves.length ?? 0, this.activeBook.longestLinePly(this.chess))
   }
 
   bookMovesAt(position: Chess): string[] {
-    const choices = new Set(this.book.moves(position))
+    const choices = new Set(this.activeBook.moves(position))
+    const opening = this.opening
+    if (!opening) return [...choices]
     const history = position.history({ verbose: true }).map(toUci)
-    const selected = this.opening.moves[this.startingPly + history.length]
-    if (selected && this.startingPly === 0 && history.every((move, index) => move === this.opening.moves[index])
+    const selected = opening.moves[this.startingPly + history.length]
+    if (selected && this.startingPly === 0 && history.every((move, index) => move === opening.moves[index])
       && position.moves({ verbose: true }).some((move) => toUci(move) === selected)) choices.add(selected)
     return [...choices]
   }
@@ -81,8 +85,9 @@ export class TrainingSession {
     if (lastPlayerIndex < 0) return false
     for (let index = history.length - 1; index >= lastPlayerIndex; index -= 1) this.chess.undo()
     const remaining = this.chess.history({ verbose: true }).map(toUci)
-    this.bookActive = this.startingPly === 0 && remaining.every((move, index) => move === this.opening.moves[index])
-    this.openingReached = this.startingPly > 0 || remaining.length >= this.opening.moves.length && this.opening.moves.every((move, index) => move === remaining[index])
+    const opening = this.opening
+    this.bookActive = Boolean(opening && this.startingPly === 0 && remaining.every((move, index) => move === opening.moves[index]))
+    this.openingReached = Boolean(opening && (this.startingPly > 0 || remaining.length >= opening.moves.length && opening.moves.every((move, index) => move === remaining[index])))
     this.opportunities.splice(0, this.opportunities.length, ...this.opportunities.filter((opportunity) => opportunity.ply < lastPlayerIndex))
     this.opportunityCheckPlies = this.opportunityCheckPlies.filter((ply) => ply < lastPlayerIndex)
     this.completed = false
@@ -96,7 +101,7 @@ export class TrainingSession {
     const move = tryMove(this.chess, input)
     if (!move) return null
     this.feedback = ''
-    if (toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
+    if (this.opening && toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
     this.updateProgress()
     if (this.chess.isGameOver()) this.completed = true
     return move
@@ -106,7 +111,7 @@ export class TrainingSession {
     if (!this.isCpuTurn) return null
     const move = tryMove(this.chess, input)
     if (!move) return null
-    if (toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
+    if (this.opening && toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
     this.updateProgress()
     if (this.chess.isGameOver()) this.completed = true
     return move
@@ -130,18 +135,22 @@ export class TrainingSession {
       }
       this.bookActive = false
     }
-    const choice = this.book.pickMove(this.chess)
+    const choice = this.activeBook.pickMove(this.chess)
     if (!choice) return null
     const move = tryMove(this.chess, fromUci(choice))
     if (!move) return null
-    this.bookActive = false
+    if (this.opening) this.bookActive = false
     if (this.chess.isGameOver()) this.completed = true
     return move
   }
 
   private updateProgress(): void {
-    if (this.bookActive && this.absolutePly === this.opening.moves.length) {
+    if (this.opening && this.bookActive && this.absolutePly === this.opening.moves.length) {
       this.openingReached = true
     }
+  }
+
+  private get activeBook(): OpeningBook {
+    return this.opening ? this.book : this.commonBook
   }
 }

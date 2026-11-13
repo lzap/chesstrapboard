@@ -2,7 +2,7 @@ import { Chess, type Color, type Square } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore, type SearchResult } from './engine'
-import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, toUci, type Opening } from './openings'
+import { classifyGame, fromUci, loadCommonOpeningBook, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, searchOpenings, toUci, type Opening } from './openings'
 import { buildReview, formatScore, moveAnnotation, reviewBudget, reviewPositions, ReviewSearchCache, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { parseLinkSettings, resolveLinkOpening, shareSearch, type Difficulty } from './share'
@@ -15,6 +15,7 @@ const previewChess = new Chess()
 const preferencesKey = 'chess-trap-board-preferences-v1'
 let openings: Opening[] = []
 let openingBook = new OpeningBook([])
+let commonOpeningBook = new OpeningBook([])
 let selectedOpening: Opening | null = null
 let session: TrainingSession | null = null
 let playerColor: Color = 'w'
@@ -510,7 +511,7 @@ function refreshReview(current: TrainingSession, redrawBoard = false): void {
   if (current.completed && complete && !reviewReported) {
     reviewReported = true
     const actualOpening = classifyGame(current.chess, openings)
-    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ${positions.length} positions analyzed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
+    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `${current.opening ? 'Opening not reached' : 'No opening selected'}${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ${positions.length} positions analyzed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
   }
   render(redrawBoard)
   moveList.scrollTop = scrollTop
@@ -563,8 +564,7 @@ function renderOpeningSelection(): void {
     if (loadError) panel.textContent = loadError
     else if (shareError) panel.textContent = shareError
     else if (!openings.length) panel.textContent = 'Loading opening names…'
-    else if (!session) panel.textContent = 'No opening selected · computer will choose at random.'
-    else panel.textContent = `Random opening: ${session.opening.eco} · ${session.opening.name}`
+    else panel.textContent = 'No opening selected · computer plays common openings.'
   } else {
     const title = document.createElement('strong')
     title.textContent = `${selectedOpening.eco} · ${selectedOpening.name}`
@@ -633,7 +633,10 @@ function render(redrawBoard = true): void {
   boardHint.classList.toggle('opportunity-cue', showOpportunityCue)
   boardHint.textContent = viewingHistory ? 'History' : showOpportunityCue
     ? 'Possible opportunity · find your best reply'
-    : session ? session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game' : session.bookActive ? 'Following opening' : session.hasBookContinuation ? 'Following database' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
+    : session ? !session.opening ? session.hasBookContinuation ? 'Following common openings' : 'Full game'
+      : session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game'
+        : session.bookActive ? 'Following opening' : session.hasBookContinuation ? 'Following database' : 'Full game'
+      : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
@@ -711,10 +714,9 @@ function render(redrawBoard = true): void {
 
 function startGame(initialMove?: MoveInput, startAtOpening = false): void {
   if (startAtOpening && !selectedOpening) return
-  const opening = selectedOpening ?? pickOpening(openings, initialMove)
-  if (!opening) return
+  if (!openings.length) return
   invalidateGame()
-  session = new TrainingSession(opening, playerColor, openingBook, startAtOpening)
+  session = new TrainingSession(selectedOpening, playerColor, openingBook, startAtOpening, commonOpeningBook)
   shareError = ''
   savePreferences()
   orientation = playerColor
@@ -823,7 +825,7 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async () =>
   const white = session.playerColor === 'w' ? 'Player' : 'Computer'
   const black = session.playerColor === 'b' ? 'Player' : 'Computer'
   const resultOverride = session.finishReason === 'resigned' ? (session.playerColor === 'w' ? '0-1' : '1-0') : undefined
-  const pgn = exportPgn(session.chess, white, black, session.openingReached ? { name: session.opening.name, eco: session.opening.eco } : undefined, resultOverride)
+  const pgn = exportPgn(session.chess, white, black, session.openingReached && session.opening ? { name: session.opening.name, eco: session.opening.eco } : undefined, resultOverride)
   try {
     await navigator.clipboard.writeText(pgn)
   } catch {
@@ -865,9 +867,10 @@ if (linkSettings.frequency) element<HTMLSelectElement>('#mistake-frequency').val
 if (linkSettings.size) element<HTMLSelectElement>('#mistake-size').value = linkSettings.size
 if (linkSettings.evaluation !== null) element<HTMLInputElement>('#evaluation-toggle').checked = linkSettings.evaluation
 render()
-Promise.all([loadOpenings(), loadOpeningBook()]).then(([loaded, book]) => {
+Promise.all([loadOpenings(), loadOpeningBook(), loadCommonOpeningBook()]).then(([loaded, book, commonBook]) => {
   openings = loaded
   openingBook = book
+  commonOpeningBook = commonBook
   selectedOpening = linkSettings.requested
     ? linkSettings.openingCode !== null ? resolveLinkOpening(openings, linkSettings.openingCode, linkSettings.openingName) : null
     : savedOpening ? openings.find((opening) => opening.eco === savedOpening[0] && opening.name === savedOpening[1]) ?? null : null

@@ -1,23 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
-import { OpeningBook, pickOpening, positionKey, type Opening } from './openings'
-
-const options: Opening[] = [
-  { id: 0, eco: 'C50', name: 'Italian Game', moves: ['e2e4', 'e7e5'], position: '' },
-  { id: 1, eco: 'B20', name: 'Sicilian Defense', moves: ['e2e4', 'c7c5'], position: '' },
-  { id: 2, eco: 'D06', name: "Queen's Gambit", moves: ['d2d4', 'd7d5'], position: '' },
-]
+import { OpeningBook, positionKey } from './openings'
+import commonBookData from '../public/data/common-book.json'
 
 describe('optional opening selection', () => {
-  it('chooses among lines compatible with the player’s first move', () => {
-    expect(pickOpening(options, { from: 'e2', to: 'e4' }, () => 0)?.name).toBe('Italian Game')
-    expect(pickOpening(options, { from: 'e2', to: 'e4' }, () => 0.99)?.name).toBe('Sicilian Defense')
-  })
-
-  it('chooses from all options before a move or when none match', () => {
-    expect(pickOpening(options, undefined, () => 0.99)?.name).toBe("Queen's Gambit")
-    expect(pickOpening(options, { from: 'g1', to: 'h3' }, () => 0.99)?.name).toBe("Queen's Gambit")
-    expect(pickOpening([])).toBeNull()
+  it('ships a common book with mainstream first moves and no unusual first moves', () => {
+    const book = new OpeningBook(commonBookData.positions as [string, string[], number][])
+    expect(book.moves(new Chess())).toEqual(['c2c4', 'd2d4', 'e2e4', 'g1f3'])
+    const afterE4 = new Chess()
+    afterE4.move('e4')
+    expect(book.moves(afterE4)).toContain('e7e5')
+    expect(book.moves(afterE4)).not.toContain('b7b5')
   })
 
   it('finds a legal database continuation after a move-order transposition', () => {
