@@ -20,6 +20,7 @@ describe('postgame review', () => {
     expect(review.entries[1].lossCp).toBe(200)
     expect(review.entries[1].grade).toBe('mistake')
     expect(review.entries[1].opportunity).toBe('missed')
+    expect(review.entries[2].replyFound).toBe(false)
     expect(review.entries[2].bestSan).toBe('e5')
     expect(review.initialScore).toEqual({ kind: 'cp', value: 20 })
     expect(review.missed).toBe(1)
@@ -46,8 +47,22 @@ describe('postgame review', () => {
     const review = buildReview(moves, positions, [opportunity])
     expect(review.entries[1].lossCp).toBe(50)
     expect(review.entries[1].opportunity).toBe('used')
+    expect(review.entries[2].replyFound).toBe(true)
     expect(review.used).toBe(1)
     const vanished = { ...positions[2], lines: [{ ...positions[2].lines[0], score: { kind: 'cp' as const, value: 25 } }] }
-    expect(buildReview(moves, [...positions.slice(0, 2), vanished, positions[3]], [opportunity]).entries[1].opportunity).toBe('unconfirmed')
+    const shiftedReview = buildReview(moves, [...positions.slice(0, 2), vanished, positions[3]], [opportunity])
+    expect(shiftedReview.entries[1].opportunity).toBe('unconfirmed')
+    expect(shiftedReview.entries[2].replyFound).toBe(true)
+  })
+
+  it('keeps the full principal variation for the hover text', () => {
+    const chess = new Chess()
+    chess.move('e4')
+    const moves = chess.history({ verbose: true })
+    const positions: SearchResult[] = [
+      { rootTurn: 'w', bestMove: 'e2e4', lines: [{ rank: 1, depth: 14, score: { kind: 'cp', value: 20 }, moves: ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6', 'b5a4', 'g8f6'] }] },
+      { rootTurn: 'b', bestMove: 'e7e5', lines: [{ rank: 1, depth: 14, score: { kind: 'cp', value: -20 }, moves: ['e7e5'] }] },
+    ]
+    expect(buildReview(moves, positions, []).entries[0].bestLine).toBe('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6')
   })
 })

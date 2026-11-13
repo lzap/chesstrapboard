@@ -341,6 +341,8 @@ async function runReview(): Promise<void> {
     if (token !== generation || current !== session) return
     review = result
     reviewing = false
+    const actualOpening = classifyGame(current.chess, openings)
+    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${result.generated} generated; ${result.used} found, ${result.missed} missed. Underlines mark generated CPU moves; ! marks found replies and ? missed replies. Move grades are estimates.`)
     render()
   } catch (error) {
     if (token !== generation || current !== session) return
@@ -415,16 +417,11 @@ function renderReview(): void {
   const liveEnabled = element<HTMLInputElement>('#evaluation-toggle').checked
   element<HTMLElement>('#review-progress').textContent = reviewing
     ? `Analyzing ${reviewDone} of ${reviewTotal} positions…`
-    : reviewError || (review ? 'Review complete. Select a move to inspect it.' : liveEnabled && evaluationError ? evaluationError : liveEnabled && evaluating ? 'Evaluating position…' : '')
+    : reviewError || (liveEnabled && evaluationError ? evaluationError : liveEnabled && evaluating ? 'Evaluating position…' : '')
   const meter = element<HTMLProgressElement>('#review-meter')
   meter.hidden = !reviewing
   meter.value = reviewTotal ? Math.round(reviewDone / reviewTotal * 100) : 0
   element<HTMLButtonElement>('#cancel-review').hidden = !reviewing
-  element<HTMLButtonElement>('#review-button').hidden = !session || !session.completed || reviewing
-  if (review && session) {
-    const actualOpening = classifyGame(session.chess, openings)
-    element<HTMLElement>('#review-summary').textContent = `${session.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${session.opportunityChecks} opportunity ${session.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. Underlines mark generated CPU moves and the player's replies. Move grades are estimates.`
-  } else element<HTMLElement>('#review-summary').textContent = ''
   const fen = positionAt(position).fen()
   const score = review
     ? (position === 0 ? review.initialScore : review.entries[position - 1]?.whiteScore ?? null)
@@ -437,20 +434,11 @@ function renderReview(): void {
   element<HTMLElement>('#review-position').textContent = position === 0 ? 'Starting position' : `Move ${position} of ${total}`
   element<HTMLButtonElement>('#review-prev').disabled = position === 0
   element<HTMLButtonElement>('#review-next').disabled = position >= total
-  element<HTMLButtonElement>('#review-live').hidden = position >= total
   const detail = element<HTMLElement>('#review-detail')
   const entry = review?.entries[position - 1]
-  detail.hidden = !entry
-  if (entry && review) {
-    const moveLabel = `${Math.floor((position + 1) / 2)}${entry.color === 'w' ? '.' : '...'} ${entry.san}`
-    const best = entry.bestSan ? ` Best move: ${entry.bestSan}.` : ''
-    const line = entry.bestLine ? ` Suggested line: ${entry.bestLine}.` : ''
-    const previousOpportunity = review.entries[position - 2]?.opportunity
-    const opportunity = entry.opportunity
-      ? ` Engine-generated opportunity: ${entry.opportunity.replace('-', ' ')}.`
-      : previousOpportunity ? ` Opportunity reply: ${previousOpportunity.replace('-', ' ')}.` : ''
-    detail.textContent = `${moveLabel} · ${entry.grade}${entry.lossCp === null ? '' : ` · about ${(entry.lossCp / 100).toFixed(1)} pawns lost`}.${best}${line}${opportunity}`
-  } else detail.textContent = ''
+  detail.textContent = entry?.bestLine ?? ''
+  detail.title = entry?.bestLine ?? ''
+  detail.setAttribute('aria-label', entry?.bestLine ? `Suggested line: ${entry.bestLine}` : 'No suggested line')
 }
 
 function render(): void {
@@ -468,7 +456,7 @@ function render(): void {
   const boardHint = element<HTMLElement>('#board-hint')
   const showOpportunityCue = opportunityNow && !viewingHistory && element<HTMLInputElement>('#opportunity-cue-toggle').checked
   boardHint.classList.toggle('opportunity-cue', showOpportunityCue)
-  boardHint.textContent = viewingHistory ? 'History · return to latest to play' : showOpportunityCue
+  boardHint.textContent = viewingHistory ? 'History' : showOpportunityCue
     ? 'Possible opportunity · find your best reply'
     : session ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
@@ -499,12 +487,11 @@ function render(): void {
         button.type = 'button'
         button.dataset.ply = String(ply)
         const entry = review?.entries[ply - 1]
-        const replyOutcome = review?.entries[ply - 2]?.opportunity
-        button.textContent = moves[ply - 1]
+        const replyMark = entry?.replyFound === undefined ? '' : entry.replyFound ? '!' : '?'
+        button.textContent = `${moves[ply - 1]}${replyMark}`
         button.setAttribute('aria-current', String(position === ply))
-        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${entry ? `, ${entry.grade}` : ''}${entry?.opportunity ? `, generated opportunity: ${entry.opportunity}` : ''}${replyOutcome ? `, opportunity reply: ${replyOutcome}` : ''}`)
+        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
         if (entry?.opportunity) button.classList.add('generated-opportunity')
-        if (replyOutcome) button.classList.add('opportunity-reply')
         button.addEventListener('click', () => navigateTo(ply))
         row.append(button)
       }
@@ -524,7 +511,7 @@ function render(): void {
   hintButton.textContent = hintSearching ? 'Thinking…' : hintMove ? 'Hide hint' : 'Hint'
   hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
   element<HTMLElement>('#hint-feedback').textContent = hintFeedback
-  element<HTMLButtonElement>('#finish-button').disabled = !session || session.completed
+  element<HTMLButtonElement>('#finish-button').disabled = !session || reviewing || session.completed && Boolean(review)
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = openings.length === 0
   renderReview()
@@ -576,18 +563,21 @@ element<HTMLButtonElement>('#flip-button').addEventListener('click', () => {
   render()
 })
 element<HTMLButtonElement>('#finish-button').addEventListener('click', () => {
+  if (session?.completed) {
+    void runReview()
+    return
+  }
   invalidateGame()
   session?.finish('stopped')
   render()
   void runReview()
 })
 element<HTMLButtonElement>('#retry-cpu-button').addEventListener('click', () => void runCpu())
-element<HTMLButtonElement>('#review-button').addEventListener('click', () => void runReview())
 element<HTMLButtonElement>('#cancel-review').addEventListener('click', () => {
   generation += 1
   engine.stop()
   reviewing = false
-  reviewError = 'Review cancelled. You can analyze again.'
+  reviewError = 'Review cancelled.'
   render()
 })
 element<HTMLButtonElement>('#review-prev').addEventListener('click', () => {
@@ -596,7 +586,6 @@ element<HTMLButtonElement>('#review-prev').addEventListener('click', () => {
 element<HTMLButtonElement>('#review-next').addEventListener('click', () => {
   navigateTo(positionPly() + 1)
 })
-element<HTMLButtonElement>('#review-live').addEventListener('click', () => navigateTo(session?.chess.history().length ?? 0))
 document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio) => radio.addEventListener('change', () => {
   invalidateGame()
   playerColor = radio.value as Color

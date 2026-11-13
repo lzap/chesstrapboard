@@ -35,32 +35,28 @@
           <p id="feedback" class="feedback" role="status" aria-live="polite">Loading openings…</p>
         </section>
         <section class="board-column" aria-label="Game">
-          <div class="board-top"><span class="chip" id="turn-chip">Explore traps</span><span class="board-hint" id="board-hint">Loading openings…</span></div>
+          <div class="board-top"><span class="board-hint" id="board-hint">Loading openings…</span></div>
           <div id="board-container" class="board-container"></div>
           <div class="board-bottom"><p id="status" role="status" aria-live="polite"></p><button type="button" class="text-button" id="flip-button">↻ Flip board</button></div>
-          <div class="action-row"><button type="button" id="new-button" class="button button-primary">New game</button><button type="button" id="finish-button" class="button button-secondary">End game</button><button type="button" id="retry-cpu-button" class="button button-secondary" hidden>Retry engine</button></div>
+          <div class="action-row"><button type="button" id="new-button" class="button button-primary">New game</button><button type="button" id="finish-button" class="button button-secondary">End game &amp; Analyze</button><button type="button" id="retry-cpu-button" class="button button-secondary" hidden>Retry engine</button></div>
         </section>
         <aside class="panel moves-panel" aria-label="Analysis, moves, and PGN">
           <section id="evaluation-panel" class="evaluation-panel" aria-label="Evaluation">
             <div class="evaluation"><div class="eval-track" role="img" aria-label="Evaluation hidden"><div id="eval-white" hidden></div></div><div><span class="eval-caption">EVALUATION</span><strong id="eval-label"></strong><small>White's perspective</small></div></div>
+            <div id="review-detail" class="review-detail"></div>
           </section>
           <div class="panel-heading"><div><p class="eyebrow">GAME RECORD</p><h2>Moves</h2></div><span id="move-count" class="move-count">0 moves</span></div>
           <div id="move-list" class="move-list"></div>
           <div class="pgn-panel"><div class="pgn-actions"><button type="button" id="copy-button" class="button button-secondary">Copy PGN</button><button type="button" id="hint-button" class="button button-secondary" disabled>Hint</button></div><span id="copy-feedback" role="status" aria-live="polite"></span><span id="hint-feedback" role="status" aria-live="polite"></span></div>
           <section id="review-panel" class="review-panel" aria-label="Game analysis">
-            <button type="button" id="review-button" class="text-button" hidden>Analyze again</button>
             <p id="review-progress" class="review-progress" role="status" aria-live="polite"></p>
             <progress id="review-meter" max="100" value="0" hidden></progress>
             <button type="button" id="cancel-review" class="text-button" hidden>Cancel review</button>
-            <p id="review-summary" class="review-summary"></p>
             <div class="review-navigation"><button type="button" id="review-prev" class="button button-secondary">← Previous</button><span id="review-position">Starting position</span><button type="button" id="review-next" class="button button-secondary">Next →</button></div>
             <p class="navigation-help">Wheel or ←/→: one move · ↑/↓: two</p>
-            <button type="button" id="review-live" class="text-button" hidden>Return to latest</button>
-            <div id="review-detail" class="review-detail" hidden></div>
           </section>
         </aside>
       </main>
-      <footer>Made for thoughtful opening practice · <a href="https://github.com/lzap/chesstrapboard#licenses-and-credits">Licenses and credits</a></footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

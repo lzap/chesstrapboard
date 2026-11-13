@@ -16,6 +16,7 @@ export interface ReviewEntry {
   grade: Grade
   whiteScore: EngineScore | null
   opportunity?: OpportunityOutcome
+  replyFound?: boolean
 }
 
 export interface GameReview {
@@ -46,10 +47,10 @@ function gradeLoss(loss: number | null): Grade {
   return 'blunder'
 }
 
-function lineSan(fen: string, moves: string[], maximum = 6): string {
+function lineSan(fen: string, moves: string[]): string {
   const board = new Chess(fen)
   const line: string[] = []
-  for (const uci of moves.slice(0, maximum)) {
+  for (const uci of moves) {
     try { line.push(board.move(fromUci(uci)).san) } catch { break }
   }
   return line.join(' ')
@@ -93,8 +94,11 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
     else if (replyEntry.lossCp <= 120) outcome = 'partial'
     else outcome = 'missed'
     cpuEntry.opportunity = outcome
-    if (outcome === 'used') used += 1
-    if (outcome === 'missed') missed += 1
+    if (replyEntry) {
+      replyEntry.replyFound = toUci(moves[opportunity.ply + 1]) === opportunity.suggestedReply || outcome === 'used'
+      if (replyEntry.replyFound) used += 1
+      else missed += 1
+    }
   }
   const initial = positions[0]?.lines.find((line) => line.rank === 1)
   return { initialScore: initial ? scoreForWhite(initial.score, positions[0].rootTurn) : null, entries, generated: opportunities.length, used, missed }

@@ -2,13 +2,12 @@
 
 A static opening trainer for beginners. GitHub Actions builds the site for GitHub Pages at <https://lukas.zapletalovi.com/chesstrapboard/>. This is the HTTPS custom domain used by `lzap`'s Pages site.
 
-Choose one of 3,865 Lichess opening lines or leave the opening unset to let the computer choose at random. A White player's first board move begins a game and selects a compatible random line when possible; a Black player can click a Black piece to begin after the computer's first move. **New game** also starts or restarts immediately. The self-hosted Stockfish.js WebAssembly engine follows the chosen line while applicable, then continues the full game. You may play either side and deviate at any time. From its third move, the CPU may search for an engine-validated mistake even during the opening. Difficulty presets change the normal thinking budget. A separate control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns: Off, 25%, 50%, 85%, or 95%. New visitors start at 95%. A size control selects the intended advantage range: Mild targets about 0.3–1.0 pawns, Medium 0.6–2.5, and Large 1.5–8.0. Candidates receive a second engine check from the player's resulting position before play. These are overlapping engine estimates, not guaranteed gains. If no suitable move is found, the CPU keeps following the line or plays normally. A lower thinking budget can still lead to ordinary engine errors.
-
-The evaluation card sits above the move list and stays visible. Its score and bar stay blank during play by default; **Show evaluation during play** starts a separate, self-hosted engine Worker and displays an estimate for the viewed position. A validated candidate can briefly trigger a visual cue above the board and a chime. **Opportunity hint & sound** controls both and defaults on. The app waits until the game ends to grade moves and explain opportunities. Review progress, summary, navigation, and selected-move details appear below **Copy PGN**, so changing labels do not shift the move list. The cancellable postgame review reports checks and generated candidates, and underlines the generated CPU moves and the player's replies in the move list. It uses no glyphs or grade marks in that list. If the postgame search no longer confirms an advantage, the result remains unconfirmed. Select a move for the engine's suggested line, estimated grade, and opportunity outcome.
-
-Click a move to replay it. The mouse wheel over the board, move list, evaluation card, or review controls steps through positions; Left/Right arrow keys step one played move, and Up/Down keys step two. Return to the latest position to resume play. **Copy PGN** copies the complete game without showing a notation box. **Hint** beside it asks the self-hosted engine for a suggested move at the viewed position: a gold ring marks the starting square and a blue ring marks the destination. Click again to hide it; moving or navigating clears it. Hints are available on your turn or while viewing history, and wait until CPU thinking or review finishes.
-
-The gentle move tap and two-note opportunity chime are synthesized locally with Web Audio. New visitors start with White, no opening selected, Beginner difficulty, 95% deliberate mistake attempts, Large opportunity size, evaluation hidden during play, both sound controls on, and volume at 50%. Preferences are saved locally. No sound file is downloaded.
+- Select a Lichess opening or leave it unset for a random line. Make your first move or press **New game** to begin.
+- Play as White or Black against the self-hosted Stockfish engine. It follows the opening when possible and may deliberately offer an advantage from its third move.
+- Adjust CPU difficulty, mistake frequency, and opportunity size. Turn on live evaluation if you want scores during play.
+- Use **Hint** for a suggested move. Optional local sounds and an opportunity cue can alert you during play.
+- Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; an underlined CPU move marks an opportunity, followed by `!` or `?` on your reply.
+- Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.
 
 ## Development
 
@@ -34,6 +33,8 @@ The engine's matching Worker and WASM files are committed under `public/engine/`
 ## Licenses and credits
 
 This project's own code and synthesized sound are MIT licensed; see [LICENSE](LICENSE). Every third-party component retains its upstream license:
+
+The GitHub sponsor configuration in [.github/FUNDING.yml](.github/FUNDING.yml) lists `lzap` as its only funding option.
 
 | Component | Purpose | License | Source |
 |---|---|---|---|
