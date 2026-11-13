@@ -26,8 +26,9 @@
             <select id="difficulty"><option value="beginner">Beginner · quicker moves</option><option value="intermediate" selected>Intermediate</option><option value="strong">Strong · longer thinking</option></select>
             <p class="setting-help">Difficulty changes the engine's thinking time. It is not a measured Elo rating.</p>
             <label class="field-label setting-label" for="mistake-frequency">Deliberate mistake attempts</label>
-            <select id="mistake-frequency"><option value="off">Off</option><option value="rare">Rare · 10% of eligible turns</option><option value="sometimes" selected>Sometimes · 25%</option><option value="often">Often · 45%</option></select>
+            <select id="mistake-frequency"><option value="off">Off</option><option value="rare">Rare · 10% of eligible turns</option><option value="sometimes" selected>Sometimes · 25%</option><option value="often">Often · 45%</option><option value="always">Every eligible turn · 100%</option></select>
             <p class="setting-help">From its third move, the computer may look for a trap, even during the selected opening. Without a suitable mistake, it follows the line or plays normally. Attempts are spaced apart.</p>
+            <p id="opportunity-status" class="setting-help" aria-live="polite">Opportunity checks begin on the computer’s third move.</p>
             <label class="field-label setting-label" for="mistake-size">Opportunity size</label>
             <select id="mistake-size"><option value="mild">Mild</option><option value="medium" selected>Medium</option><option value="large">Large</option></select>
           </div>
@@ -43,11 +44,9 @@
           <div class="board-bottom"><p id="status" role="status" aria-live="polite"></p><button type="button" class="text-button" id="flip-button">↻ Flip board</button></div>
           <div class="action-row"><button type="button" id="new-button" class="button button-primary">New game</button><button type="button" id="finish-button" class="button button-secondary">End game</button><button type="button" id="retry-cpu-button" class="button button-secondary" hidden>Retry engine</button></div>
         </section>
-        <aside class="panel moves-panel" aria-label="Moves and PGN">
-          <div class="panel-heading"><div><p class="eyebrow">GAME RECORD</p><h2>Moves</h2></div><span id="move-count" class="move-count">0 moves</span></div>
-          <div id="move-list" class="move-list"></div>
-          <section id="review-panel" class="review-panel" aria-label="Game review and evaluation">
-            <div class="review-heading"><h3>Game review</h3><button type="button" id="review-button" class="text-button" hidden>Analyze again</button></div>
+        <aside class="panel moves-panel" aria-label="Analysis, moves, and PGN">
+          <section id="review-panel" class="review-panel" aria-label="Analysis and evaluation">
+            <button type="button" id="review-button" class="text-button" hidden>Analyze again</button>
             <p id="review-progress" class="review-progress" role="status" aria-live="polite"></p>
             <progress id="review-meter" max="100" value="0" hidden></progress>
             <button type="button" id="cancel-review" class="text-button" hidden>Cancel review</button>
@@ -58,6 +57,8 @@
             <button type="button" id="review-live" class="text-button" hidden>Return to latest</button>
             <div id="review-detail" class="review-detail" hidden></div>
           </section>
+          <div class="panel-heading"><div><p class="eyebrow">GAME RECORD</p><h2>Moves</h2></div><span id="move-count" class="move-count">0 moves</span></div>
+          <div id="move-list" class="move-list"></div>
           <div class="pgn-panel"><button type="button" id="copy-button" class="button button-secondary">Copy PGN</button><span id="copy-feedback" role="status" aria-live="polite"></span></div>
         </aside>
       </main>

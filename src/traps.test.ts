@@ -34,12 +34,20 @@ describe('generated mistake selection', () => {
     expect(shouldAttemptMistake('rare', 0.09)).toBe(true)
     expect(shouldAttemptMistake('rare', 0.10)).toBe(false)
     expect(shouldAttemptMistake('often', 0.44)).toBe(true)
+    expect(shouldAttemptMistake('always', 0.99)).toBe(true)
   })
 
   it('requires a plausible short-search move with a deeper punishable downside', () => {
     expect(findCandidateMistake(fen, shallow, deep, 'medium')).toEqual({ move: 'f7f6', reply: 'e4e5', lossCp: 230 })
     expect(findCandidateMistake(fen, shallow, deep, 'mild')).toBeNull()
     expect(findCandidateMistake(fen, { ...shallow, rootTurn: 'w' }, deep, 'medium')).toBeNull()
+  })
+
+  it('finds a medium opportunity near one pawn while keeping the size controls distinct', () => {
+    const onePawn: SearchResult = { ...deep, lines: [deep.lines[0], deep.lines[1], { ...deep.lines[2], score: { kind: 'cp', value: -120 } }] }
+    expect(findCandidateMistake(fen, shallow, onePawn, 'medium')).toEqual({ move: 'd7d6', reply: 'e4e5', lossCp: 120 })
+    expect(findCandidateMistake(fen, shallow, onePawn, 'mild')).toBeNull()
+    expect(findCandidateMistake(fen, shallow, onePawn, 'large')).toEqual({ move: 'f7f6', reply: 'e4e5', lossCp: 230 })
   })
 
   it('does not treat mate scores as comparable centipawns', () => {

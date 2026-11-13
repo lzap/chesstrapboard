@@ -185,6 +185,7 @@ async function runCpu(): Promise<void> {
   const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
   const attempt = canSeekOpportunity(ply, current.opening.moves.length, current.opportunities.length, lastOpportunity?.ply)
     && shouldAttemptMistake(frequency, Math.random())
+  if (attempt) current.opportunityChecks += 1
   if (!attempt && current.advanceBook()) {
     sounds.playMove()
     render()
@@ -220,7 +221,10 @@ async function runCpu(): Promise<void> {
     thinking = false
     const chosenMove = candidate?.move ?? result.bestMove
     if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
-    if (candidate) current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
+    if (candidate) {
+      current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
+      current.feedback = 'Possible opportunity. Look for your best reply; the review will explain it after the game.'
+    }
     sounds.playMove()
     if (candidate) sounds.playOpportunity(sounds.moveEnabled ? 0.17 : 0)
     render()
@@ -338,7 +342,7 @@ function renderReview(): void {
   element<HTMLButtonElement>('#review-button').hidden = !session || !session.completed || reviewing
   if (review && session) {
     const actualOpening = classifyGame(session.chess, openings)
-    element<HTMLElement>('#review-summary').textContent = `${session.openingReached ? 'Target opening reached.' : `Target opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${review.generated} generated opportunity ${review.generated === 1 ? 'attempt' : 'attempts'}; ${review.used} used, ${review.missed} missed. Marks are estimates: ?! inaccuracy, ? mistake, ?? blunder, ! strong reply, !! used opportunity, !? partial opportunity.`
+    element<HTMLElement>('#review-summary').textContent = `${session.openingReached ? 'Target opening reached.' : `Target opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${session.opportunityChecks} opportunity ${session.opportunityChecks === 1 ? 'check' : 'checks'}, ${review.generated} generated; ${review.used} found, ${review.missed} missed. ◇ and a gold underline mark the CPU move; green underlines mark found replies, red missed replies, amber partial replies. Move grades are estimates: ?! inaccuracy, ? mistake, ?? blunder, ! strong reply, !! found opportunity, !? partial opportunity.`
   } else element<HTMLElement>('#review-summary').textContent = ''
   const fen = positionAt(position).fen()
   const score = review
@@ -360,7 +364,10 @@ function renderReview(): void {
     const moveLabel = `${Math.floor((position + 1) / 2)}${entry.color === 'w' ? '.' : '...'} ${entry.san}`
     const best = entry.bestSan ? ` Best move: ${entry.bestSan}.` : ''
     const line = entry.bestLine ? ` Suggested line: ${entry.bestLine}.` : ''
-    const opportunity = entry.opportunity ? ` Engine-generated opportunity: ${entry.opportunity.replace('-', ' ')}.` : ''
+    const previousOpportunity = review.entries[position - 2]?.opportunity
+    const opportunity = entry.opportunity
+      ? ` Engine-generated opportunity: ${entry.opportunity.replace('-', ' ')}.`
+      : previousOpportunity ? ` Opportunity reply: ${previousOpportunity.replace('-', ' ')}.` : ''
     detail.textContent = `${moveLabel}${annotationForMove(review.entries, position - 1)} · ${entry.grade}${entry.lossCp === null ? '' : ` · about ${(entry.lossCp / 100).toFixed(1)} pawns lost`}.${best}${line}${opportunity}`
   } else detail.textContent = ''
 }
@@ -379,6 +386,9 @@ function render(): void {
     ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game'
     : 'Select an opening to begin'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
+  element<HTMLElement>('#opportunity-status').textContent = session
+    ? `Opportunity checks: ${session.opportunityChecks} · generated: ${session.opportunities.length}`
+    : 'Opportunity checks begin on the computer’s third move.'
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
   const moveList = element<HTMLDivElement>('#move-list')
@@ -406,12 +416,15 @@ function render(): void {
         button.type = 'button'
         button.dataset.ply = String(ply)
         const entry = review?.entries[ply - 1]
+        const replyOutcome = review?.entries[ply - 2]?.opportunity
         const mark = review ? annotationForMove(review.entries, ply - 1) : ''
-        button.textContent = `${moves[ply - 1]}${mark}`
+        button.textContent = `${moves[ply - 1]}${mark}${entry?.opportunity ? ' ◇' : ''}`
         button.setAttribute('aria-current', String(position === ply))
-        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${mark}${entry ? `, ${entry.grade}` : ''}`)
+        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${mark}${entry ? `, ${entry.grade}` : ''}${entry?.opportunity ? `, generated opportunity: ${entry.opportunity}` : ''}${replyOutcome ? `, opportunity reply: ${replyOutcome}` : ''}`)
         if (entry) button.classList.add(`grade-${entry.grade}`)
         if (mark === '!!') button.classList.add('grade-opportunity')
+        if (entry?.opportunity) button.classList.add('generated-opportunity')
+        if (replyOutcome) button.classList.add('opportunity-reply', `opportunity-${replyOutcome}`)
         button.addEventListener('click', () => navigateTo(ply))
         row.append(button)
       }

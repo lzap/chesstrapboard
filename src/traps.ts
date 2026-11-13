@@ -2,7 +2,7 @@ import { Chess } from 'chess.js'
 import type { SearchResult } from './engine'
 import { fromUci } from './openings'
 
-export type MistakeFrequency = 'off' | 'rare' | 'sometimes' | 'often'
+export type MistakeFrequency = 'off' | 'rare' | 'sometimes' | 'often' | 'always'
 export type MistakeSize = 'mild' | 'medium' | 'large'
 
 export interface GeneratedOpportunity {
@@ -19,8 +19,9 @@ export interface CandidateMistake {
   lossCp: number
 }
 
-const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.1, sometimes: 0.25, often: 0.45 }
-const bands: Record<MistakeSize, [number, number]> = { mild: [60, 160], medium: [160, 350], large: [350, 800] }
+const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.1, sometimes: 0.25, often: 0.45, always: 1 }
+const bands: Record<MistakeSize, [number, number]> = { mild: [30, 100], medium: [60, 250], large: [150, 800] }
+const plausibleLoss: Record<MistakeSize, number> = { mild: 100, medium: 150, large: 200 }
 
 export function shouldAttemptMistake(frequency: MistakeFrequency, random: number): boolean {
   return random < chances[frequency]
@@ -43,7 +44,7 @@ export function findCandidateMistake(fen: string, shallow: SearchResult, deep: S
   const deepBest = deep.lines.find((line) => line.rank === 1)
   if (!shallowBest || !deepBest || shallowBest.score.kind !== 'cp' || deepBest.score.kind !== 'cp') return null
   const [minimum, maximum] = mistakeBand(size)
-  const plausible = new Map(shallow.lines.filter((line) => line.score.kind === 'cp' && shallowBest.score.value - line.score.value <= 100).map((line) => [line.moves[0], line]))
+  const plausible = new Map(shallow.lines.filter((line) => line.score.kind === 'cp' && shallowBest.score.value - line.score.value <= plausibleLoss[size]).map((line) => [line.moves[0], line]))
   const candidates = deep.lines
     .filter((line) => line.rank > 1 && line.score.kind === 'cp' && line.moves.length > 1 && plausible.has(line.moves[0]))
     .map((line) => ({ move: line.moves[0], reply: line.moves[1], lossCp: deepBest.score.value - line.score.value, cpuScore: line.score.value }))

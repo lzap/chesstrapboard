@@ -12,6 +12,7 @@ export class TrainingSession {
   completed = false
   feedback = ''
   finishReason: 'resigned' | 'stopped' | null = null
+  opportunityChecks = 0
   readonly opportunities: GeneratedOpportunity[] = []
 
   constructor(opening: Opening, playerColor: Color) {
