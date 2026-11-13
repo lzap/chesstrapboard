@@ -5,6 +5,7 @@ import { EngineClient } from './engine'
 import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, toUci, type Opening } from './openings'
 import { analyzeGame, formatScore, whiteShare, type GameReview } from './review'
 import { TrainingSession, type Mode } from './session'
+import { MoveSound } from './sound'
 import { findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
@@ -28,6 +29,7 @@ let reviewTotal = 0
 let reviewError = ''
 let reviewIndex: number | null = null
 const engine = new EngineClient()
+const sound = new MoveSound()
 
 function savePreferences(): void {
   try {
@@ -38,6 +40,8 @@ function savePreferences(): void {
       difficulty: element<HTMLSelectElement>('#difficulty').value,
       frequency: element<HTMLSelectElement>('#mistake-frequency').value,
       size: element<HTMLSelectElement>('#mistake-size').value,
+      sound: element<HTMLInputElement>('#sound-toggle').checked,
+      volume: element<HTMLInputElement>('#sound-volume').value,
     }))
   } catch { /* Preferences remain usable for this session. */ }
 }
@@ -50,6 +54,10 @@ function restorePreferences(): [string, string] | null {
     orientation = playerColor
     element<HTMLInputElement>(`input[name="side"][value="${playerColor}"]`).checked = true
     element<HTMLInputElement>('#hint-toggle').checked = saved.hint === true
+    element<HTMLInputElement>('#sound-toggle').checked = saved.sound === true
+    if (typeof saved.volume === 'string' && /^\d{1,3}$/.test(saved.volume)) element<HTMLInputElement>('#sound-volume').value = saved.volume
+    sound.enabled = element<HTMLInputElement>('#sound-toggle').checked
+    sound.volume = Number(element<HTMLInputElement>('#sound-volume').value) / 100
     for (const [id, value] of [['#difficulty', saved.difficulty], ['#mistake-frequency', saved.frequency], ['#mistake-size', saved.size]] as const) {
       const select = element<HTMLSelectElement>(id)
       if (typeof value === 'string' && [...select.options].some((option) => option.value === value)) select.value = value
@@ -61,7 +69,15 @@ function restorePreferences(): [string, string] | null {
 
 const board = new BoardView(element('#board-container'), (input) => {
   if (!session) return
+  const before = session.chess.history().length
   const move = session.playPlayer(input)
+  if (move) {
+    sound.play()
+    if (session.mode === 'memorize' && session.chess.history().length > before + 1) {
+      const current = session
+      window.setTimeout(() => { if (session === current) sound.play() }, 130)
+    }
+  }
   render()
   if (move && mode === 'traps') {
     if (session.completed) void runReview()
@@ -91,6 +107,7 @@ async function runCpu(): Promise<void> {
   const current = session
   if (!current || current.mode !== 'traps' || !current.isCpuTurn) return
   if (current.advanceBook()) {
+    sound.play()
     render()
     if (current.completed) void runReview()
     return
@@ -123,6 +140,7 @@ async function runCpu(): Promise<void> {
     const chosenMove = candidate?.move ?? result.bestMove
     if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
     if (candidate) current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
+    sound.play()
     render()
     if (current.completed) void runReview()
   } catch (error) {
@@ -349,6 +367,7 @@ function startPractice(): void {
   invalidateGame()
   session = new TrainingSession(selectedOpening, mode, playerColor)
   orientation = playerColor
+  if (session.chess.history().length) sound.play()
   render()
   if (mode === 'traps') void runCpu()
 }
@@ -409,6 +428,14 @@ document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio
   render()
 }))
 element<HTMLInputElement>('#hint-toggle').addEventListener('change', () => { savePreferences(); render() })
+element<HTMLInputElement>('#sound-toggle').addEventListener('change', () => {
+  sound.enabled = element<HTMLInputElement>('#sound-toggle').checked
+  savePreferences()
+})
+element<HTMLInputElement>('#sound-volume').addEventListener('input', () => {
+  sound.volume = Number(element<HTMLInputElement>('#sound-volume').value) / 100
+  savePreferences()
+})
 for (const id of ['#difficulty', '#mistake-frequency', '#mistake-size']) element<HTMLSelectElement>(id).addEventListener('change', savePreferences)
 element<HTMLButtonElement>('#copy-button').addEventListener('click', async (event) => {
   const button = event.currentTarget as HTMLButtonElement

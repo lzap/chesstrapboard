@@ -37,6 +37,8 @@
             <label class="field-label setting-label" for="mistake-size">Opportunity size</label>
             <select id="mistake-size"><option value="mild">Mild</option><option value="medium" selected>Medium</option><option value="large">Large</option></select>
           </div>
+          <label class="check-option sound-option"><input id="sound-toggle" type="checkbox" /> Wooden-style move sound</label>
+          <label class="volume-option" for="sound-volume">Sound volume <input id="sound-volume" type="range" min="0" max="100" value="35" /></label>
           <button type="button" id="start-button" class="button button-primary start-button" disabled>Start practice</button>
           <p id="feedback" class="feedback" role="status" aria-live="polite">Choose an opening to begin.</p>
         </section>

@@ -1,10 +1,12 @@
 # CHESS TRAP BOARD
 
-A static opening trainer for beginners. The site is built with GitHub Actions and published with GitHub Pages at <https://lzap.github.io/chesstrapboard/>.
+A static opening trainer for beginners. GitHub Actions builds the site for GitHub Pages at <https://lzap.github.io/chesstrapboard/>.
 
 The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** plays a full game against a self-hosted Stockfish.js WebAssembly engine. Difficulty presets change the normal thinking budget. A separate Off/Rare/Sometimes/Often control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns; a size control selects the intended advantage range. If no suitable move is found, the CPU plays normally. A lower thinking budget can still lead to ordinary engine errors.
 
 Explore traps hides evaluations during play. When the game ends, the browser analyzes the moves, shows an evaluation bar, grades approximate move losses, and reviews generated opportunities. Select any reviewed move to replay its position and see the engine's suggested line. Review can take time on a long game and can be cancelled. PGN remains copyable throughout.
+
+The optional wooden-style move tap is synthesized locally with Web Audio. It is off by default, has a volume control, and downloads no sound file.
 
 ## Development
 
@@ -16,6 +18,7 @@ npm run check
 npm test
 npm run verify:data
 npm run verify:engine
+npm run verify:licenses
 npm run build
 npm run dev
 ```
@@ -28,7 +31,18 @@ The engine's matching Worker and WASM files are committed under `public/engine/`
 
 ## Licenses and credits
 
-This project's own code is MIT licensed; see [LICENSE](LICENSE). Third-party packages and data retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the pinned versions, sources, and notices. Runtime engine and opening data will be hosted by this repository, without a third-party service.
+This project's own code and synthesized sound are MIT licensed; see [LICENSE](LICENSE). Every third-party component retains its upstream license:
+
+| Component | Purpose | License | Source |
+|---|---|---|---|
+| [chess.js 1.4.0](https://github.com/jhlywa/chess.js) | Rules and PGN | BSD-2-Clause | [License text](public/licenses/chess.js-LICENSE.txt) |
+| [Lichess chess-openings](https://github.com/lichess-org/chess-openings) at `3ba6b20` | Opening names and lines | CC0 1.0 | [Snapshot](data/upstream/README.md) |
+| [Stockfish.js 19.0.1](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1) | Browser WASM engine | GPL-3.0 | [License, checksums, and source](public/engine/SOURCE.md) |
+| [Vite 8.3.8](https://github.com/vitejs/vite) | Site build | MIT | [Upstream license](https://github.com/vitejs/vite/blob/main/packages/vite/LICENSE.md) |
+| [TypeScript 7.0.2](https://github.com/microsoft/TypeScript) | Type checking | Apache-2.0 | [Upstream license](https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt) |
+| [Vitest 5.1.0](https://github.com/vitest-dev/vitest) | Unit tests | MIT | [Upstream license](https://github.com/vitest-dev/vitest/blob/main/LICENSE) |
+
+The lockfile pins transitive npm packages, and `npm run verify:licenses` rejects packages without one of the recorded free-software licenses. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) carries the exact versions and distribution notes. Runtime engine and opening data are hosted by this repository without a third-party service.
 
 ## Design
 

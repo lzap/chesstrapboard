@@ -11,7 +11,8 @@
     "test": "vitest run",
     "prepare:data": "node scripts/prepare-openings.mjs",
     "verify:data": "node scripts/prepare-openings.mjs --check",
-    "verify:engine": "node scripts/verify-engine.mjs"
+    "verify:engine": "node scripts/verify-engine.mjs",
+    "verify:licenses": "node scripts/verify-licenses.mjs"
   },
   "dependencies": {
     "chess.js": "1.4.0"
