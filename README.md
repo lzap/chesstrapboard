@@ -2,7 +2,7 @@
 
 A static opening trainer for beginners. The site is built with GitHub Actions and published with GitHub Pages at <https://lzap.github.io/chesstrapboard/>.
 
-The first local milestone provides the application shell. Playable chess, opening practice, an engine opponent, and review will be added in small commits before publication.
+The local board supports two-player play, legal moves, promotion, move history, and PGN copy. Opening practice, an engine opponent, and review will be added in small commits before publication.
 
 ## Development
 
@@ -11,6 +11,7 @@ Use Node.js 22.12 or newer.
 ```sh
 npm ci
 npm run check
+npm test
 npm run build
 npm run dev
 ```
