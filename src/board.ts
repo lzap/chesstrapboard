@@ -15,13 +15,15 @@ export class BoardView {
   private promotion: { from: Square; to: Square } | null = null
   private focusSquare: Square | null = null
   private allowedColor: Color | null = null
+  private inputEnabled = true
 
   constructor(private container: HTMLElement, private onMove: (move: MoveInput) => void) {}
 
-  update(chess: Chess, orientation: Color, allowedColor: Color | null = null): void {
+  update(chess: Chess, orientation: Color, allowedColor: Color | null = null, inputEnabled = true): void {
     this.chess = chess
     this.orientation = orientation
     this.allowedColor = allowedColor
+    this.inputEnabled = inputEnabled
     this.selected = null
     this.promotion = null
     this.draw()
@@ -63,7 +65,7 @@ export class BoardView {
   }
 
   private handleSquare(square: Square): void {
-    if (this.promotion || this.chess.isGameOver()) return
+    if (this.promotion || this.chess.isGameOver() || !this.inputEnabled) return
     const piece = this.chess.get(square)
     if (this.selected) {
       const moves = this.chess.moves({ square: this.selected, verbose: true }).filter((move) => move.to === square)

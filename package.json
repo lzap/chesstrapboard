@@ -8,7 +8,9 @@
     "check": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare:data": "node scripts/prepare-openings.mjs",
+    "verify:data": "node scripts/prepare-openings.mjs --check"
   },
   "dependencies": {
     "chess.js": "1.4.0"

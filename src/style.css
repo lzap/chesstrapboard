@@ -25,6 +25,26 @@ a { color: #d9bb78; }
 .eyebrow { color: #e0bd77; font-size: 10px; font-weight: 800; letter-spacing: .19em; margin: 0; }
 .intro-panel h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(35px, 3vw, 48px); line-height: 1.05; letter-spacing: -.04em; margin: 20px 0; }
 .intro-panel > p:not(.eyebrow) { color: #c3cec0; line-height: 1.55; font-size: 14px; }
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 5px; background: #16241b; border-radius: 11px; margin: 22px 0; }
+.mode-button { background: none; color: #b8c7b6; border: 0; border-radius: 8px; padding: 10px 6px; font-size: 11px; font-weight: 800; }
+.mode-button.active { background: #d9bb78; color: #1f291e; }
+.field-label { display: block; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
+#opening-search { width: 100%; border: 1px solid #648064; border-radius: 9px; background: #16241b; color: #f3f1e9; padding: 11px 12px; font-size: 12px; }
+#opening-search::placeholder { color: #9aab99; }
+.opening-results { max-height: 226px; overflow-y: auto; margin-top: 7px; border: 1px solid #ffffff1b; border-radius: 9px; padding: 5px; color: #b2c0af; font-size: 12px; }
+.opening-result { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; color: #e6e9df; border: 0; border-radius: 6px; padding: 8px 6px; font-size: 11px; }
+.opening-result:hover, .opening-result[aria-selected="true"] { background: #38543d; }
+.opening-result span { flex: 0 0 34px; color: #d9bb78; font-weight: 800; }
+.opening-result strong { font-weight: 600; }
+.selected-opening { border: 1px solid #6b795c; background: #2b3e2d; color: #e9eddf; border-radius: 9px; margin-top: 12px; padding: 10px; min-height: 56px; font-size: 12px; }
+.selected-opening p { margin: 5px 0 0; color: #b6c5b1; font-size: 11px; line-height: 1.5; }
+.side-picker { display: flex; gap: 12px; border: 0; margin: 18px 0 12px; padding: 0; font-size: 12px; }
+.side-picker legend { font-weight: 800; margin-bottom: 8px; }
+.side-picker label, .check-option { display: flex; align-items: center; gap: 6px; color: #d5dfd1; }
+.side-picker input, .check-option input { accent-color: #d9bb78; }
+.check-option { font-size: 12px; margin: 0 0 15px; }
+.start-button { width: 100%; }
+.feedback { min-height: 38px; border-top: 1px solid #ffffff20; padding-top: 13px; color: #dce7cf !important; font-size: 12px !important; }
 .milestone-note { display: flex; gap: 12px; background: #2e4433; border: 1px solid #537358; border-radius: 12px; padding: 13px; color: #c5d6c3; font-size: 12px; line-height: 1.5; margin-top: 28px; }
 .milestone-note strong { color: #f1f4e9; }
 .note-dot { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #b9d593; margin-top: 4px; box-shadow: 0 0 0 4px #b9d59324; }
@@ -78,4 +98,4 @@ a { color: #d9bb78; }
 .promotion button { width: 56px; height: 56px; border: 2px solid #d9bb78; background: #e5d8b5; color: #202721; border-radius: 9px; font-size: 42px; }
 footer { padding: 0 clamp(16px, 3vw, 42px) 35px; color: #96a497; font-size: 11px; }
 @media (max-width: 1080px) { .play-layout { grid-template-columns: minmax(220px, .7fr) minmax(330px, 1.3fr); } .moves-panel { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .site-header { height: 70px; } .play-layout { display: flex; flex-direction: column; padding-top: 20px; } .intro-panel, .board-column, .moves-panel { width: 100%; max-width: none; } .intro-panel h1 { font-size: 32px; } .intro-panel { padding: 18px; } .intro-panel > p:not(.eyebrow), .quick-guide { display: none; } .milestone-note { margin-top: 15px; } .board-column { order: 1; } .intro-panel { order: 0; } .moves-panel { order: 2; } .piece { font-size: clamp(30px, 10vw, 60px); } }
+@media (max-width: 700px) { .site-header { height: 70px; } .play-layout { display: flex; flex-direction: column; padding-top: 20px; } .intro-panel, .board-column, .moves-panel { width: 100%; max-width: none; } .intro-panel h1 { font-size: 32px; } .intro-panel { padding: 18px; } .intro-panel > p:not(.eyebrow):not(.feedback), .quick-guide { display: none; } .board-column { order: 1; } .intro-panel { order: 0; } .moves-panel { order: 2; } .piece { font-size: clamp(30px, 10vw, 60px); } }
