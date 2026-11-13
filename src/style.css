@@ -118,6 +118,7 @@ a { color: #d9bb78; }
 .review-navigation span { font-size: 10px; text-align: center; color: #d2ddce; }
 .navigation-help { color: #9eae9e; font-size: 10px; margin: 9px 0 0; text-align: center; }
 .review-detail { height: 17px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #d1dfcd; font-size: 11px; line-height: 17px; }
+.review-detail:not(:empty) { cursor: ew-resize; }
 .promotion { position: absolute; inset: 0; z-index: 5; background: #142117dd; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .promotion p { font-weight: 700; }
 .promotion > div { display: flex; gap: 8px; }

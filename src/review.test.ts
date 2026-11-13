@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildReview, formatScore, whiteShare } from './review'
+import { analyzeGame, buildReview, formatScore, whiteShare } from './review'
 import type { SearchResult } from './engine'
 
 describe('postgame review', () => {
@@ -64,5 +64,23 @@ describe('postgame review', () => {
       { rootTurn: 'b', bestMove: 'e7e5', lines: [{ rank: 1, depth: 14, score: { kind: 'cp', value: -20 }, moves: ['e7e5'] }] },
     ]
     expect(buildReview(moves, positions, []).entries[0].bestLine).toBe('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6')
+  })
+
+  it('searches backward while keeping evaluations attached to the right moves', async () => {
+    const chess = new Chess()
+    chess.move('e4')
+    chess.move('e5')
+    const moves = chess.history({ verbose: true })
+    const fens = [moves[0].before, ...moves.map((move) => move.after)]
+    const searched: string[] = []
+    const progress: number[] = []
+    const review = await analyzeGame(chess, async (fen) => {
+      searched.push(fen)
+      return { rootTurn: fen.split(' ')[1] as 'w' | 'b', bestMove: null, lines: [{ rank: 1, depth: 8, score: { kind: 'cp', value: (fens.indexOf(fen) + 1) * 10 }, moves: [] }] }
+    }, [], (done) => progress.push(done), () => false)
+    expect(searched).toEqual([...fens].reverse())
+    expect(progress).toEqual([1, 2, 3])
+    expect(review.initialScore).toEqual({ kind: 'cp', value: 10 })
+    expect(review.entries.map((entry) => entry.whiteScore)).toEqual([{ kind: 'cp', value: -20 }, { kind: 'cp', value: 30 }])
   })
 })

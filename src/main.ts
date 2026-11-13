@@ -35,6 +35,8 @@ let evaluationToken = 0
 let hintMove: MoveInput | null = null
 let hintSearching = false
 let hintToken = 0
+let linePreview: { session: TrainingSession; ply: number; positions: Chess[]; step: number } | null = null
+let linePreviewTimer: number | null = null
 const evaluationCache = new Map<string, EngineScore | null>()
 const engine = new EngineClient()
 const evaluationEngine = new EngineClient()
@@ -95,10 +97,10 @@ function positionAt(ply: number): Chess {
   return position
 }
 
-function cancelEvaluation(): void {
+function cancelEvaluation(clearScore = true): void {
   evaluationToken += 1
   evaluationEngine.terminate()
-  liveEvaluation = null
+  if (clearScore) liveEvaluation = null
   evaluating = false
   evaluationError = ''
 }
@@ -125,7 +127,6 @@ async function evaluateVisiblePosition(): Promise<void> {
   }
   const token = ++evaluationToken
   evaluationEngine.terminate()
-  liveEvaluation = null
   evaluating = true
   evaluationError = ''
   renderReview()
@@ -141,6 +142,7 @@ async function evaluateVisiblePosition(): Promise<void> {
   } catch (error) {
     if (token !== evaluationToken || current !== session) return
     evaluating = false
+    liveEvaluation = null
     evaluationError = error instanceof Error ? error.message : 'Evaluation unavailable'
     renderReview()
   }
@@ -152,6 +154,7 @@ function navigateTo(ply: number): void {
   const next = Math.max(0, Math.min(ply, total))
   if (next === positionPly()) return
   clearHint()
+  clearLinePreview()
   const focusMove = element<HTMLDivElement>('#move-list').contains(document.activeElement)
   viewPly = next === total ? null : next
   render()
@@ -182,8 +185,68 @@ const board = new BoardView(element('#board-container'), (input) => {
   return true
 })
 
+function renderBoard(visiblePosition = positionAt(positionPly()), viewingHistory = Boolean(session && positionPly() < session.chess.history().length)): void {
+  const preview = linePreview?.session === session && linePreview.ply === positionPly() ? linePreview.positions[linePreview.step] : null
+  board.update(preview ?? visiblePosition, orientation, session?.playerColor ?? playerColor,
+    !preview && (session ? session.isPlayerTurn && !thinking && !viewingHistory : playerColor === 'w' && openings.length > 0),
+    preview ? null : hintMove)
+}
+
+function clearLinePreview(): void {
+  if (linePreviewTimer !== null) window.clearTimeout(linePreviewTimer)
+  linePreviewTimer = null
+  linePreview = null
+}
+
+function previewSuggestedLine(event: PointerEvent): void {
+  if (!session || !review) return
+  if (linePreviewTimer !== null) window.clearTimeout(linePreviewTimer)
+  linePreviewTimer = null
+  const ply = positionPly()
+  const entry = review.entries[ply - 1]
+  if (!entry?.bestMoves.length) return
+  if (linePreview?.session !== session || linePreview.ply !== ply) {
+    const start = positionAt(ply - 1).fen()
+    const chess = new Chess(start)
+    const played: string[] = []
+    const positions: Chess[] = []
+    for (const uci of entry.bestMoves) {
+      try {
+        chess.move(fromUci(uci))
+        played.push(uci)
+        const snapshot = new Chess(start)
+        for (const move of played) snapshot.move(fromUci(move))
+        positions.push(snapshot)
+      } catch { break }
+    }
+    if (!positions.length) return
+    linePreview = { session, ply, positions, step: -1 }
+  }
+  const detail = element<HTMLElement>('#review-detail')
+  const bounds = detail.getBoundingClientRect()
+  const text = document.createRange()
+  text.selectNodeContents(detail)
+  const sweepWidth = Math.max(1, Math.min(bounds.width, text.getBoundingClientRect().width))
+  const fraction = Math.max(0, Math.min(0.999, (event.clientX - bounds.left) / sweepWidth))
+  const step = Math.floor(fraction * linePreview.positions.length)
+  if (step === linePreview.step) return
+  linePreview.step = step
+  renderBoard()
+}
+
+function restoreSuggestedLine(): void {
+  if (linePreviewTimer !== null) window.clearTimeout(linePreviewTimer)
+  linePreviewTimer = window.setTimeout(() => {
+    linePreviewTimer = null
+    if (!linePreview) return
+    linePreview = null
+    renderBoard()
+  }, 180)
+}
+
 function invalidateGame(): void {
   clearHint()
+  clearLinePreview()
   generation += 1
   engine.stop()
   cancelEvaluation()
@@ -315,7 +378,8 @@ async function runReview(): Promise<void> {
   const current = session
   if (!current || !current.completed) return
   const token = generation
-  cancelEvaluation()
+  clearLinePreview()
+  cancelEvaluation(false)
   reviewing = true
   review = null
   reviewError = ''
@@ -422,12 +486,14 @@ function renderReview(): void {
   const fen = positionAt(position).fen()
   const score = review
     ? (position === 0 ? review.initialScore : review.entries[position - 1]?.whiteScore ?? null)
-    : liveEnabled && liveEvaluation?.fen === fen ? liveEvaluation.score : null
+    : liveEnabled ? liveEvaluation?.score ?? null : null
+  const activeEvaluation = Boolean(review || liveEnabled && session)
+  const staleEvaluation = Boolean(liveEnabled && !review && liveEvaluation && liveEvaluation.fen !== fen)
   const fill = element<HTMLElement>('#eval-white')
-  fill.hidden = score === null
-  if (score) fill.style.height = `${whiteShare(score)}%`
-  element<HTMLElement>('#eval-label').textContent = score ? formatScore(score) : ''
-  element<HTMLElement>('.eval-track').setAttribute('aria-label', score ? `Evaluation after selected move: ${formatScore(score)} from White's perspective` : review || liveEnabled ? 'Evaluation pending or unavailable' : 'Evaluation hidden')
+  fill.hidden = !activeEvaluation
+  fill.style.height = `${whiteShare(score)}%`
+  element<HTMLElement>('#eval-label').textContent = score ? formatScore(score) : activeEvaluation ? evaluating || reviewing ? '…' : '—' : ''
+  element<HTMLElement>('.eval-track').setAttribute('aria-label', score ? `${staleEvaluation ? 'Previous position evaluation while updating' : 'Evaluation after selected move'}: ${formatScore(score)} from White's perspective` : activeEvaluation ? 'Evaluation pending or unavailable' : 'Evaluation hidden')
   element<HTMLElement>('#review-position').textContent = position === 0 ? 'Starting position' : `Move ${position} of ${total}`
   element<HTMLButtonElement>('#review-prev').disabled = position === 0
   element<HTMLButtonElement>('#review-next').disabled = position >= total
@@ -444,7 +510,7 @@ function render(): void {
   const visiblePosition = positionAt(position)
   const viewingHistory = Boolean(session && position < chess.history().length)
   const opportunityNow = Boolean(session?.isPlayerTurn && session.opportunities.at(-1)?.ply === chess.history().length - 1)
-  board.update(visiblePosition, orientation, session?.playerColor ?? playerColor, session ? session.isPlayerTurn && !thinking && !viewingHistory : playerColor === 'w' && openings.length > 0, hintMove)
+  renderBoard(visiblePosition, viewingHistory)
   element<HTMLElement>('#status').textContent = viewingHistory
     ? position === 0 ? 'Viewing starting position' : `Viewing move ${position} of ${chess.history().length}`
     : session?.completed
@@ -638,6 +704,9 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async () =>
   window.setTimeout(() => { feedback.textContent = '' }, 2500)
 })
 element<HTMLButtonElement>('#hint-button').addEventListener('click', () => void revealHint())
+element<HTMLElement>('#review-detail').addEventListener('pointerenter', previewSuggestedLine)
+element<HTMLElement>('#review-detail').addEventListener('pointermove', previewSuggestedLine)
+element<HTMLElement>('#review-detail').addEventListener('pointerleave', restoreSuggestedLine)
 
 const savedOpening = restorePreferences()
 render()

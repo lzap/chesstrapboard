@@ -12,6 +12,7 @@ export interface ReviewEntry {
   color: 'w' | 'b'
   bestSan: string | null
   bestLine: string
+  bestMoves: string[]
   lossCp: number | null
   grade: Grade
   whiteScore: EngineScore | null
@@ -73,6 +74,7 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
       color: move.color,
       bestSan,
       bestLine: best ? lineSan(move.before, best.moves) : '',
+      bestMoves: best?.moves ?? [],
       lossCp,
       grade: gradeLoss(lossCp),
       whiteScore: afterScore,
@@ -113,12 +115,13 @@ export async function analyzeGame(
 ): Promise<GameReview> {
   const moves = chess.history({ verbose: true })
   const positions = [moves[0]?.before ?? new Chess().fen(), ...moves.map((move) => move.after)]
-  const results: SearchResult[] = []
-  for (const [index, fen] of positions.entries()) {
+  const results: SearchResult[] = new Array(positions.length)
+  for (let index = positions.length - 1; index >= 0; index -= 1) {
     if (cancelled()) throw new Error('Review cancelled')
+    const fen = positions[index]
     const shouldDeepen = opportunities.some((opportunity) => index === opportunity.ply || index === opportunity.ply + 1 || index === opportunity.ply + 2)
-    results.push(await search(fen, shouldDeepen ? 850 : 260))
-    onProgress(index + 1, positions.length)
+    results[index] = await search(fen, shouldDeepen ? 850 : 260)
+    onProgress(positions.length - index, positions.length)
   }
   if (cancelled()) throw new Error('Review cancelled')
   return buildReview(moves, results, opportunities)
