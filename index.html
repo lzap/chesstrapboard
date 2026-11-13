@@ -14,9 +14,7 @@
         <a class="source-link" href="https://github.com/lzap/chesstrapboard">Source ↗</a>
       </header>
       <main class="play-layout">
-        <section class="panel intro-panel" aria-labelledby="intro-title">
-          <p class="eyebrow">TRAIN WITH PURPOSE</p>
-          <h1 id="intro-title">Your next move starts here.</h1>
+        <section class="panel intro-panel" aria-label="Training settings">
           <div class="mode-switch" aria-label="Training mode">
             <button type="button" id="memorize-mode" class="mode-button active" aria-pressed="true">Memorize lines</button>
             <button type="button" id="traps-mode" class="mode-button" aria-pressed="false">Explore traps</button>
@@ -37,7 +35,8 @@
             <label class="field-label setting-label" for="mistake-size">Opportunity size</label>
             <select id="mistake-size"><option value="mild">Mild</option><option value="medium" selected>Medium</option><option value="large">Large</option></select>
           </div>
-          <label class="check-option sound-option"><input id="sound-toggle" type="checkbox" /> Wooden-style move sound</label>
+          <label class="check-option sound-option"><input id="sound-toggle" type="checkbox" /> Move sound</label>
+          <label class="check-option" id="opportunity-sound-option" hidden><input id="opportunity-sound-toggle" type="checkbox" /> Opportunity sound</label>
           <label class="volume-option" for="sound-volume">Sound volume <input id="sound-volume" type="range" min="0" max="100" value="35" /></label>
           <button type="button" id="start-button" class="button button-primary start-button" disabled>Start practice</button>
           <p id="feedback" class="feedback" role="status" aria-live="polite">Choose an opening to begin.</p>

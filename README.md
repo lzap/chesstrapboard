@@ -4,9 +4,9 @@ A static opening trainer for beginners. GitHub Actions builds the site for GitHu
 
 The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** plays a full game against a self-hosted Stockfish.js WebAssembly engine. Difficulty presets change the normal thinking budget. A separate Off/Rare/Sometimes/Often control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns; a size control selects the intended advantage range. If no suitable move is found, the CPU plays normally. A lower thinking budget can still lead to ordinary engine errors.
 
-Explore traps hides evaluations during play. When the game ends, the browser analyzes the moves, shows an evaluation bar, grades approximate move losses, and reviews generated opportunities. Select any reviewed move to replay its position and see the engine's suggested line. Review can take time on a long game and can be cancelled. PGN remains copyable throughout.
+Explore traps hides evaluations during play. When the game ends, the browser analyzes the moves, shows an evaluation bar, grades approximate move losses, and reviews generated opportunities. Select any reviewed move to replay its position and see the engine's suggested line. Review can take time on a long game and can be cancelled. PGN remains copyable throughout. An optional opportunity chime can cue a validated deliberate CPU mistake during play; grades and suggested lines remain in the postgame review.
 
-The optional wooden-style move tap is synthesized locally with Web Audio. It is off by default, has a volume control, and downloads no sound file.
+The gentle move tap and two-note opportunity chime are synthesized locally with Web Audio. Each has its own toggle, both are off by default, and they share a volume control. No sound file is downloaded.
 
 ## Development
 
