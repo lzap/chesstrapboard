@@ -6,7 +6,7 @@ import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, type O
 import { analyzeGame, annotationForMove, formatScore, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
-import { findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
+import { canSeekOpportunity, findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
 const element = <T extends HTMLElement>(selector: string): T => document.querySelector<T>(selector)!
@@ -180,7 +180,12 @@ function difficultyBudget(): number {
 async function runCpu(): Promise<void> {
   const current = session
   if (!current || !current.isCpuTurn) return
-  if (current.advanceBook()) {
+  const ply = current.chess.history().length
+  const lastOpportunity = current.opportunities.at(-1)
+  const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
+  const attempt = canSeekOpportunity(ply, current.opening.moves.length, current.opportunities.length, lastOpportunity?.ply)
+    && shouldAttemptMistake(frequency, Math.random())
+  if (!attempt && current.advanceBook()) {
     sounds.playMove()
     render()
     void evaluateVisiblePosition()
@@ -193,23 +198,24 @@ async function runCpu(): Promise<void> {
   render()
   try {
     const fen = current.chess.fen()
-    const ply = current.chess.history().length
-    const lastOpportunity = current.opportunities.at(-1)
-    const eligible = (current.openingReached || !current.bookActive)
-      && ply <= Math.min(36, Math.max(20, current.opening.moves.length + 10))
-      && current.opportunities.length < 3
-      && (!lastOpportunity || ply - lastOpportunity.ply >= 6)
-    const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
     let result
     let candidate = null
-    if (eligible && shouldAttemptMistake(frequency, Math.random())) {
+    if (attempt) {
       const shallow = await engine.search(fen, Math.max(180, Math.floor(difficultyBudget() / 2)), 5)
       if (token !== generation || current !== session) return
       result = await engine.search(fen, Math.max(950, difficultyBudget()), 6)
       candidate = findCandidateMistake(fen, shallow, result, element<HTMLSelectElement>('#mistake-size').value as MistakeSize)
-    } else {
-      result = await engine.search(fen, difficultyBudget())
     }
+    if (token !== generation || current !== session) return
+    if (!candidate && current.advanceBook()) {
+      thinking = false
+      sounds.playMove()
+      render()
+      void evaluateVisiblePosition()
+      if (current.completed) void runReview()
+      return
+    }
+    result ??= await engine.search(fen, difficultyBudget())
     if (token !== generation || current !== session) return
     thinking = false
     const chosenMove = candidate?.move ?? result.bestMove
@@ -223,6 +229,13 @@ async function runCpu(): Promise<void> {
   } catch (error) {
     if (token !== generation || current !== session) return
     thinking = false
+    if (current.advanceBook()) {
+      sounds.playMove()
+      render()
+      void evaluateVisiblePosition()
+      if (current.completed) void runReview()
+      return
+    }
     engineError = true
     engine.terminate()
     current.feedback = error instanceof Error ? error.message : 'Engine failed to move'

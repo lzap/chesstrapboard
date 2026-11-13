@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findCandidateMistake, shouldAttemptMistake } from './traps'
+import { canSeekOpportunity, findCandidateMistake, shouldAttemptMistake } from './traps'
 import type { SearchResult } from './engine'
 
 const shallow: SearchResult = {
@@ -19,6 +19,16 @@ const deep: SearchResult = {
 const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
 
 describe('generated mistake selection', () => {
+  it('starts seeking on the CPU third move, including during a longer selected line', () => {
+    expect(canSeekOpportunity(3, 12, 0)).toBe(false)
+    expect(canSeekOpportunity(4, 12, 0)).toBe(true) // White CPU about to play move 3.
+    expect(canSeekOpportunity(5, 12, 0)).toBe(true) // Black CPU about to play move 3.
+    expect(canSeekOpportunity(5, 12, 1, 1)).toBe(false)
+    expect(canSeekOpportunity(7, 12, 1, 1)).toBe(true)
+    expect(canSeekOpportunity(8, 12, 3, 2)).toBe(false)
+    expect(canSeekOpportunity(37, 12, 0)).toBe(false)
+  })
+
   it('separates frequency from the quality of an eligible mistake', () => {
     expect(shouldAttemptMistake('off', 0)).toBe(false)
     expect(shouldAttemptMistake('rare', 0.09)).toBe(true)

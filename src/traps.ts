@@ -26,6 +26,13 @@ export function shouldAttemptMistake(frequency: MistakeFrequency, random: number
   return random < chances[frequency]
 }
 
+export function canSeekOpportunity(ply: number, openingPlyCount: number, generatedCount: number, lastGeneratedPly?: number): boolean {
+  return Math.floor(ply / 2) + 1 >= 3
+    && ply <= Math.min(36, Math.max(20, openingPlyCount + 10))
+    && generatedCount < 3
+    && (lastGeneratedPly === undefined || ply - lastGeneratedPly >= 6)
+}
+
 export function mistakeBand(size: MistakeSize): [number, number] {
   return bands[size]
 }
