@@ -305,7 +305,7 @@ async function runCpu(): Promise<void> {
   const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
   const attempt = canSeekOpportunity(ply, current.availableOpeningLength, current.opportunities.length, lastOpportunity?.ply)
     && shouldAttemptMistake(frequency, Math.random())
-  if (attempt) current.opportunityChecks += 1
+  if (attempt) current.recordOpportunityCheck(ply)
   if (!attempt && current.advanceBook()) {
     sounds.playMove()
     render()
@@ -574,6 +574,7 @@ function render(): void {
   hintButton.textContent = hintSearching ? 'Thinking…' : hintMove ? 'Hide hint' : 'Hint'
   hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
   element<HTMLButtonElement>('#finish-button').disabled = !session || reviewing || session.completed && Boolean(review)
+  element<HTMLButtonElement>('#take-back-button').disabled = !session?.canTakeBack
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = openings.length === 0
   renderReview()
@@ -620,6 +621,14 @@ document.addEventListener('keydown', (event) => {
 
 element<HTMLInputElement>('#opening-search').addEventListener('input', renderOpeningResults)
 element<HTMLButtonElement>('#new-button').addEventListener('click', () => startGame())
+element<HTMLButtonElement>('#take-back-button').addEventListener('click', () => {
+  if (!session?.canTakeBack) return
+  const current = session
+  invalidateGame()
+  current.takeBack()
+  render()
+  void evaluateVisiblePosition()
+})
 element<HTMLButtonElement>('#flip-button').addEventListener('click', () => {
   orientation = orientation === 'w' ? 'b' : 'w'
   render()

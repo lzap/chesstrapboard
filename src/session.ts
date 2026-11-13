@@ -12,7 +12,7 @@ export class TrainingSession {
   completed = false
   feedback = ''
   finishReason: 'resigned' | 'stopped' | null = null
-  opportunityChecks = 0
+  private opportunityCheckPlies: number[] = []
   readonly opportunities: GeneratedOpportunity[] = []
 
   constructor(opening: Opening, playerColor: Color, private readonly book: OpeningBook) {
@@ -39,6 +39,34 @@ export class TrainingSession {
 
   get availableOpeningLength(): number {
     return Math.max(this.opening.moves.length, this.book.longestLinePly(this.chess))
+  }
+
+  get opportunityChecks(): number {
+    return this.opportunityCheckPlies.length
+  }
+
+  get canTakeBack(): boolean {
+    return this.chess.history({ verbose: true }).some((move) => move.color === this.playerColor)
+  }
+
+  recordOpportunityCheck(ply: number): void {
+    this.opportunityCheckPlies.push(ply)
+  }
+
+  takeBack(): boolean {
+    const history = this.chess.history({ verbose: true })
+    const lastPlayerIndex = history.map((move) => move.color).lastIndexOf(this.playerColor)
+    if (lastPlayerIndex < 0) return false
+    for (let index = history.length - 1; index >= lastPlayerIndex; index -= 1) this.chess.undo()
+    const remaining = this.chess.history({ verbose: true }).map(toUci)
+    this.bookActive = remaining.every((move, index) => move === this.opening.moves[index])
+    this.openingReached = remaining.length >= this.opening.moves.length && this.opening.moves.every((move, index) => move === remaining[index])
+    this.opportunities.splice(0, this.opportunities.length, ...this.opportunities.filter((opportunity) => opportunity.ply < lastPlayerIndex))
+    this.opportunityCheckPlies = this.opportunityCheckPlies.filter((ply) => ply < lastPlayerIndex)
+    this.completed = false
+    this.finishReason = null
+    this.feedback = ''
+    return true
   }
 
   playPlayer(input: MoveInput): Move | null {

@@ -79,7 +79,7 @@ a { color: #d9bb78; }
 .black-piece { color: #202721; text-shadow: 0 1px 1px #ffffff99; }
 .coordinate { position: absolute; bottom: 3px; right: 4px; font-size: clamp(7px, .8vw, 10px); font-weight: 700; opacity: .8; }
 .text-button { color: #d9bb78; border: none; background: none; font-size: 12px; font-weight: 700; padding: 8px 0; }
-.action-row { display: flex; gap: 10px; margin-top: 16px; }
+.action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .button { border-radius: 10px; padding: 11px 17px; font-size: 12px; font-weight: 800; border: 1px solid #718571; }
 .button-primary { background: #d9bb78; color: #1f291e; border-color: #d9bb78; }
 .button-primary:hover { background: #e9cb87; }
