@@ -18,7 +18,7 @@ export class BoardView {
   private inputEnabled = true
   private hint: MoveInput | null = null
 
-  constructor(private container: HTMLElement, private onMove: (move: MoveInput) => void) {}
+  constructor(private container: HTMLElement, private onMove: (move: MoveInput) => void, private onBeforeSquare?: (square: Square) => boolean) {}
 
   update(chess: Chess, orientation: Color, allowedColor: Color | null = null, inputEnabled = true, hint: MoveInput | null = null): void {
     this.chess = chess
@@ -70,6 +70,7 @@ export class BoardView {
   }
 
   private handleSquare(square: Square): void {
+    if (this.onBeforeSquare?.(square)) return
     if (this.promotion || this.chess.isGameOver() || !this.inputEnabled) return
     const piece = this.chess.get(square)
     if (this.selected) {

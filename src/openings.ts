@@ -47,6 +47,12 @@ export function toUci(move: { from: string; to: string; promotion?: string }): s
   return `${move.from}${move.to}${move.promotion ?? ''}`
 }
 
+export function pickOpening(openings: Opening[], firstMove?: MoveInput, random = Math.random): Opening | null {
+  const matching = firstMove ? openings.filter((opening) => opening.moves[0] === toUci(firstMove)) : openings
+  const pool = matching.length ? matching : openings
+  return pool[Math.floor(random() * pool.length)] ?? null
+}
+
 export function openingSan(opening: Opening): string[] {
   const chess = new Chess()
   return opening.moves.map((uci) => chess.move(fromUci(uci)).san)

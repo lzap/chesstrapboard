@@ -1,8 +1,8 @@
 /** Optional sounds synthesized locally with Web Audio. No audio files are loaded. */
 export class GameSounds {
-  moveEnabled = false
-  opportunityEnabled = false
-  volume = 0.35
+  moveEnabled = true
+  opportunityEnabled = true
+  volume = 0.5
   private context: AudioContext | null = null
 
   /** Call from a user gesture so an opportunity chime can play after the engine thinks. */

@@ -38,21 +38,6 @@ export function whiteShare(score: EngineScore | null): number {
   return Math.max(2, Math.min(98, 50 + 48 * Math.tanh(score.value / 400)))
 }
 
-export function annotationForMove(entries: ReviewEntry[], index: number): string {
-  const entry = entries[index]
-  if (!entry) return ''
-  const previous = entries[index - 1]
-  if (previous?.opportunity === 'used') return entry.grade === 'best' ? '!!' : '!'
-  if (previous?.opportunity === 'partial') return '!?'
-  switch (entry.grade) {
-    case 'best': return previous?.grade === 'mistake' || previous?.grade === 'blunder' ? '!' : ''
-    case 'inaccuracy': return '?!'
-    case 'mistake': return '?'
-    case 'blunder': return '??'
-    default: return ''
-  }
-}
-
 function gradeLoss(loss: number | null): Grade {
   if (loss === null) return 'unrated'
   if (loss <= 30) return 'best'
