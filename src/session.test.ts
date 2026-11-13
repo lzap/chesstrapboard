@@ -35,6 +35,10 @@ describe('opening practice', () => {
     expect(session.playPlayer({ from: 'd2', to: 'd4' })?.san).toBe('d4')
     expect(session.bookActive).toBe(false)
     expect(session.advanceBook()).toBeNull()
+    expect(session.playCpu({ from: 'd7', to: 'd5' })?.san).toBe('d5')
+    session.finish('stopped')
+    expect(session.completed).toBe(true)
+    expect(session.playPlayer({ from: 'c2', to: 'c4' })).toBeNull()
   })
 
   it('derives SAN preview and classifies a named position', () => {

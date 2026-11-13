@@ -29,14 +29,14 @@ export function gameStatus(chess: Chess): string {
   return `${chess.turn() === 'w' ? 'White' : 'Black'} to move${chess.isCheck() ? ' — check' : ''}`
 }
 
-export function exportPgn(chess: Chess, white = 'White', black = 'Black', opening?: { name: string; eco: string }): string {
+export function exportPgn(chess: Chess, white = 'White', black = 'Black', opening?: { name: string; eco: string }, resultOverride?: string): string {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '.')
   chess.setHeader('Event', 'CHESS TRAP BOARD')
   chess.setHeader('Site', 'https://lzap.github.io/chesstrapboard/')
   chess.setHeader('Date', date)
   chess.setHeader('White', white)
   chess.setHeader('Black', black)
-  chess.setHeader('Result', gameResult(chess))
+  chess.setHeader('Result', resultOverride ?? gameResult(chess))
   if (opening) {
     chess.setHeader('Opening', opening.name)
     chess.setHeader('ECO', opening.eco)

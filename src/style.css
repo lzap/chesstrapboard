@@ -43,6 +43,10 @@ a { color: #d9bb78; }
 .side-picker label, .check-option { display: flex; align-items: center; gap: 6px; color: #d5dfd1; }
 .side-picker input, .check-option input { accent-color: #d9bb78; }
 .check-option { font-size: 12px; margin: 0 0 15px; }
+.trap-controls { margin: 15px 0; }
+.trap-controls[hidden], .check-option[hidden], .action-row button[hidden] { display: none; }
+.trap-controls select { width: 100%; border: 1px solid #648064; border-radius: 9px; background: #16241b; color: #f3f1e9; padding: 11px 9px; font-size: 12px; }
+.setting-help { font-size: 11px !important; color: #aebdad !important; line-height: 1.4 !important; margin: 7px 0 0; }
 .start-button { width: 100%; }
 .feedback { min-height: 38px; border-top: 1px solid #ffffff20; padding-top: 13px; color: #dce7cf !important; font-size: 12px !important; }
 .milestone-note { display: flex; gap: 12px; background: #2e4433; border: 1px solid #537358; border-radius: 12px; padding: 13px; color: #c5d6c3; font-size: 12px; line-height: 1.5; margin-top: 28px; }

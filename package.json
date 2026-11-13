@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "prepare:data": "node scripts/prepare-openings.mjs",
-    "verify:data": "node scripts/prepare-openings.mjs --check"
+    "verify:data": "node scripts/prepare-openings.mjs --check",
+    "verify:engine": "node scripts/verify-engine.mjs"
   },
   "dependencies": {
     "chess.js": "1.4.0"

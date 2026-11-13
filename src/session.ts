@@ -13,6 +13,7 @@ export class TrainingSession {
   openingReached = false
   completed = false
   feedback = ''
+  finishReason: 'resigned' | 'stopped' | null = null
 
   constructor(opening: Opening, mode: Mode, playerColor: Color) {
     this.opening = opening
@@ -45,8 +46,25 @@ export class TrainingSession {
     this.feedback = ''
     if (this.mode === 'traps' && toUci(move) !== this.opening.moves[this.chess.history().length - 1]) this.bookActive = false
     this.updateProgress()
+    if (this.chess.isGameOver()) this.completed = true
     if (this.mode === 'memorize') this.advanceBook()
     return move
+  }
+
+  playCpu(input: MoveInput): Move | null {
+    if (!this.isCpuTurn || this.mode !== 'traps') return null
+    const move = tryMove(this.chess, input)
+    if (!move) return null
+    this.bookActive = false
+    if (this.chess.isGameOver()) this.completed = true
+    return move
+  }
+
+  finish(reason: 'resigned' | 'stopped'): void {
+    if (this.mode !== 'traps' || this.completed) return
+    this.completed = true
+    this.finishReason = reason
+    this.feedback = reason === 'resigned' ? 'You resigned. Review the game when ready.' : 'Game ended. Review the moves when ready.'
   }
 
   advanceBook(): Move | null {

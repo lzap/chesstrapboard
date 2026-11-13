@@ -2,7 +2,7 @@
 
 A static opening trainer for beginners. The site is built with GitHub Actions and published with GitHub Pages at <https://lzap.github.io/chesstrapboard/>.
 
-The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps**, the engine opponent, and postgame review will follow in the next commits before publication.
+The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** now plays a full game against a self-hosted Stockfish.js WebAssembly engine. Its difficulty presets change the thinking budget. Deliberate engine mistakes and postgame review will follow in the next commits before publication.
 
 ## Development
 
@@ -13,6 +13,7 @@ npm ci
 npm run check
 npm test
 npm run verify:data
+npm run verify:engine
 npm run build
 npm run dev
 ```
@@ -20,6 +21,8 @@ npm run dev
 The Vite base path is `/chesstrapboard/` for project Pages. The deploy workflow builds `dist/` and publishes it using the GitHub Pages artifact actions.
 
 The opening snapshot in `data/upstream/` is pinned to [Lichess chess-openings commit `3ba6b20`](https://github.com/lichess-org/chess-openings/commit/3ba6b20d31b2e6125cb0e6a2e792f400717d9d39). The browser-ready `public/data/openings.json` is committed. Refresh it deliberately with `npm run prepare:data`; CI checks it with `npm run verify:data`. The served file is about 736 KB raw and 93 KB with gzip. The browser never fetches from Lichess.
+
+The engine's matching Worker and WASM files are committed under `public/engine/`. The browser loads them from this site when Explore traps starts. Their exact release, checksums, GPL-3.0 license, and corresponding source are recorded in [public/engine/SOURCE.md](public/engine/SOURCE.md). This repository's MIT license covers our own application code; the engine remains GPL-3.0.
 
 ## Licenses and credits
 
