@@ -10,6 +10,7 @@ const files = 'abcdefgh'
 
 export class BoardView {
   private chess = new Chess()
+  private positionFen: string | null = null
   private orientation: Color = 'w'
   private selected: Square | null = null
   private promotion: { from: Square; to: Square } | null = null
@@ -21,13 +22,22 @@ export class BoardView {
   constructor(private container: HTMLElement, private onMove: (move: MoveInput) => void, private onBeforeSquare?: (square: Square) => boolean) {}
 
   update(chess: Chess, orientation: Color, allowedColor: Color | null = null, inputEnabled = true, hint: MoveInput | null = null): void {
+    const fen = chess.fen()
+    const changedPosition = this.positionFen !== fen
+    const changedInteraction = this.orientation !== orientation || this.allowedColor !== allowedColor || this.inputEnabled !== inputEnabled
+    if (changedPosition || changedInteraction) {
+      this.selected = null
+      this.promotion = null
+    }
+    if (!this.focusSquare && this.container.contains(document.activeElement) && document.activeElement instanceof HTMLButtonElement) {
+      this.focusSquare = document.activeElement.dataset.square as Square | undefined ?? null
+    }
     this.chess = chess
+    this.positionFen = fen
     this.orientation = orientation
     this.allowedColor = allowedColor
     this.inputEnabled = inputEnabled
     this.hint = hint
-    this.selected = null
-    this.promotion = null
     this.draw()
   }
 
