@@ -68,7 +68,7 @@ a { color: #d9bb78; }
 .chip { border: 1px solid #729374; background: #2a4731; color: #e2efda; font-size: 11px; border-radius: 100px; padding: 7px 12px; font-weight: 700; }
 .board-hint { color: #aab8aa; font-size: 12px; }
 .board-container { position: relative; border-radius: 9px; overflow: hidden; box-shadow: 0 20px 50px #0b140b80, 0 0 0 8px #31402f; }
-.board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; width: 100%; }
+.board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); aspect-ratio: 1; width: 100%; }
 .square { position: relative; display: grid; place-items: center; border: 0; padding: 0; min-width: 0; min-height: 0; }
 .square.light { background: #e5d8b5; color: #755c40; }
 .square.dark { background: #8c9f77; color: #354c35; }
