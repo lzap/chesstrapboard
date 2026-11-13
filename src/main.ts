@@ -6,7 +6,7 @@ import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, type O
 import { analyzeGame, annotationForMove, formatScore, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
-import { canSeekOpportunity, findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
+import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
 const element = <T extends HTMLElement>(selector: string): T => document.querySelector<T>(selector)!
@@ -205,7 +205,15 @@ async function runCpu(): Promise<void> {
       const shallow = await engine.search(fen, Math.max(180, Math.floor(difficultyBudget() / 2)), 5)
       if (token !== generation || current !== session) return
       result = await engine.search(fen, Math.max(950, difficultyBudget()), 6)
-      candidate = findCandidateMistake(fen, shallow, result, element<HTMLSelectElement>('#mistake-size').value as MistakeSize)
+      const size = element<HTMLSelectElement>('#mistake-size').value as MistakeSize
+      candidate = findCandidateMistake(fen, shallow, result, size)
+      if (candidate) {
+        const candidatePosition = new Chess(fen)
+        candidatePosition.move(fromUci(candidate.move))
+        const confirmation = await engine.search(candidatePosition.fen(), Math.max(800, difficultyBudget()))
+        if (token !== generation || current !== session) return
+        candidate = confirmCandidateMistake(fen, result, confirmation, candidate, size)
+      }
     }
     if (token !== generation || current !== session) return
     if (!candidate && current.advanceBook()) {
@@ -376,15 +384,18 @@ function render(): void {
   const chess = session?.chess ?? previewChess
   const position = positionPly()
   const viewingHistory = Boolean(session && position < chess.history().length)
+  const opportunityNow = Boolean(session?.isPlayerTurn && session.opportunities.at(-1)?.ply === chess.history().length - 1)
   board.update(positionAt(position), orientation, session?.playerColor ?? null, Boolean(session?.isPlayerTurn) && !thinking && !viewingHistory)
   element<HTMLElement>('#status').textContent = viewingHistory
     ? position === 0 ? 'Viewing starting position' : `Viewing move ${position} of ${chess.history().length}`
     : session?.completed
     ? session.finishReason ? 'Game ended' : gameStatus(chess)
     : thinking ? 'Computer is thinking…' : session ? gameStatus(chess) : 'Choose an opening to begin'
-  element<HTMLElement>('#board-hint').textContent = viewingHistory ? 'History · return to latest to play' : session
-    ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game'
-    : 'Select an opening to begin'
+  const boardHint = element<HTMLElement>('#board-hint')
+  boardHint.classList.toggle('opportunity-cue', opportunityNow && !viewingHistory)
+  boardHint.textContent = viewingHistory ? 'History · return to latest to play' : opportunityNow
+    ? '◇ Possible opportunity · find your best reply'
+    : session ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game' : 'Select an opening to begin'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
   element<HTMLElement>('#opportunity-status').textContent = session
     ? `Opportunity checks: ${session.opportunityChecks} · generated: ${session.opportunities.length}`

@@ -100,7 +100,8 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
     const replyEntry = entries[opportunity.ply + 1]
     if (!cpuEntry) continue
     let outcome: OpportunityOutcome
-    if (cpuEntry.lossCp === null || cpuEntry.lossCp < 60) outcome = 'unconfirmed'
+    const confirmationFloor = Math.min(60, Math.max(25, Math.round(opportunity.estimatedLossCp * 0.6)))
+    if (cpuEntry.lossCp === null || cpuEntry.lossCp < confirmationFloor) outcome = 'unconfirmed'
     else if (!replyEntry) outcome = 'no-reply'
     else if (replyEntry.lossCp === null) outcome = 'unconfirmed'
     else if (replyEntry.lossCp <= 50 || (positions[opportunity.ply + 1]?.bestMove && toUci(moves[opportunity.ply + 1]) === positions[opportunity.ply + 1].bestMove)) outcome = 'used'

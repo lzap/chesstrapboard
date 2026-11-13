@@ -49,9 +49,21 @@ export function findCandidateMistake(fen: string, shallow: SearchResult, deep: S
     .filter((line) => line.rank > 1 && line.score.kind === 'cp' && line.moves.length > 1 && plausible.has(line.moves[0]))
     .map((line) => ({ move: line.moves[0], reply: line.moves[1], lossCp: deepBest.score.value - line.score.value, cpuScore: line.score.value }))
     .filter((candidate) => candidate.lossCp >= minimum && candidate.lossCp <= maximum && candidate.cpuScore <= -30 && legalReply(fen, candidate.move, candidate.reply))
-    .sort((a, b) => a.lossCp - b.lossCp)
+    .sort((a, b) => Math.abs(a.lossCp - (minimum + maximum) / 2) - Math.abs(b.lossCp - (minimum + maximum) / 2) || a.lossCp - b.lossCp)
   const selected = candidates[0]
   return selected ? { move: selected.move, reply: selected.reply, lossCp: selected.lossCp } : null
+}
+
+export function confirmCandidateMistake(fen: string, root: SearchResult, after: SearchResult, candidate: CandidateMistake, size: MistakeSize): CandidateMistake | null {
+  if (root.rootTurn === after.rootTurn) return null
+  const rootBest = root.lines.find((line) => line.rank === 1)
+  const replyBest = after.lines.find((line) => line.rank === 1)
+  if (rootBest?.score.kind !== 'cp' || replyBest?.score.kind !== 'cp') return null
+  const reply = replyBest.moves[0]
+  const lossCp = rootBest.score.value + replyBest.score.value
+  const [minimum, maximum] = mistakeBand(size)
+  if (!reply || replyBest.score.value < 30 || lossCp < minimum || lossCp > maximum || !legalReply(fen, candidate.move, reply)) return null
+  return { move: candidate.move, reply, lossCp }
 }
 
 function legalReply(fen: string, move: string, reply: string): boolean {
