@@ -25,6 +25,7 @@
           <div id="selected-opening" class="selected-opening">Loading opening names…</div>
           <fieldset class="side-picker"><legend>Play as</legend><label><input type="radio" name="side" value="w" checked /> White</label><label><input type="radio" name="side" value="b" /> Black</label></fieldset>
           <label class="check-option" id="hint-option"><input id="hint-toggle" type="checkbox" /> Show the next move</label>
+          <label class="check-option" id="evaluation-option"><input id="evaluation-toggle" type="checkbox" /> Show evaluation during play</label>
           <div id="trap-controls" class="trap-controls" hidden>
             <label class="field-label" for="difficulty">Computer difficulty</label>
             <select id="difficulty"><option value="beginner">Beginner · quicker moves</option><option value="intermediate" selected>Intermediate</option><option value="strong">Strong · longer thinking</option></select>
@@ -50,18 +51,19 @@
         <aside class="panel moves-panel" aria-label="Moves and PGN">
           <div class="panel-heading"><div><p class="eyebrow">GAME RECORD</p><h2>Moves</h2></div><span id="move-count" class="move-count">0 moves</span></div>
           <div id="move-list" class="move-list"></div>
-          <div class="pgn-panel"><label for="pgn">PGN notation</label><textarea id="pgn" readonly spellcheck="false"></textarea><button type="button" id="copy-button" class="button button-secondary">Copy PGN</button></div>
-          <section id="review-panel" class="review-panel" aria-label="Postgame review" hidden>
-            <div class="review-heading"><h3>Game review</h3><button type="button" id="review-button" class="text-button">Analyze again</button></div>
+          <section id="review-panel" class="review-panel" aria-label="Game review and evaluation">
+            <div class="review-heading"><h3>Game review</h3><button type="button" id="review-button" class="text-button" hidden>Analyze again</button></div>
             <p id="review-progress" class="review-progress" role="status" aria-live="polite"></p>
             <progress id="review-meter" max="100" value="0" hidden></progress>
             <button type="button" id="cancel-review" class="text-button" hidden>Cancel review</button>
             <p id="review-summary" class="review-summary"></p>
-            <div class="evaluation"><div class="eval-track" role="img" aria-label="Position evaluation"><div id="eval-white"></div></div><div><span class="eval-caption">EVALUATION</span><strong id="eval-label">—</strong><small>White's perspective</small></div></div>
-            <div class="review-navigation"><button type="button" id="review-prev" class="button button-secondary">← Previous</button><span id="review-position">Final position</span><button type="button" id="review-next" class="button button-secondary">Next →</button></div>
-            <div id="review-detail" class="review-detail"></div>
-            <div id="review-list" class="review-list"></div>
+            <div class="evaluation"><div class="eval-track" role="img" aria-label="Evaluation hidden"><div id="eval-white" hidden></div></div><div><span class="eval-caption">EVALUATION</span><strong id="eval-label"></strong><small>White's perspective</small></div></div>
+            <div class="review-navigation"><button type="button" id="review-prev" class="button button-secondary">← Previous</button><span id="review-position">Starting position</span><button type="button" id="review-next" class="button button-secondary">Next →</button></div>
+            <p class="navigation-help">Wheel or ←/→: one move · ↑/↓: two</p>
+            <button type="button" id="review-live" class="text-button" hidden>Return to latest</button>
+            <div id="review-detail" class="review-detail" hidden></div>
           </section>
+          <div class="pgn-panel"><button type="button" id="copy-button" class="button button-secondary">Copy PGN</button><span id="copy-feedback" role="status" aria-live="polite"></span></div>
         </aside>
       </main>
       <footer>Made for thoughtful opening practice · <a href="https://github.com/lzap/chesstrapboard/blob/main/THIRD_PARTY_NOTICES.md">Licenses and credits</a></footer>

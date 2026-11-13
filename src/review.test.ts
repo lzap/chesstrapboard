@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildReview, formatScore, whiteShare } from './review'
+import { annotationForMove, buildReview, formatScore, whiteShare } from './review'
 import type { SearchResult } from './engine'
 
 describe('postgame review', () => {
@@ -21,6 +21,9 @@ describe('postgame review', () => {
     expect(review.entries[1].grade).toBe('mistake')
     expect(review.entries[1].opportunity).toBe('missed')
     expect(review.entries[2].bestSan).toBe('e5')
+    expect(review.initialScore).toEqual({ kind: 'cp', value: 20 })
+    expect(annotationForMove(review.entries, 0)).toBe('')
+    expect(annotationForMove(review.entries, 1)).toBe('?')
     expect(review.missed).toBe(1)
   })
 
@@ -43,6 +46,7 @@ describe('postgame review', () => {
     ]
     const review = buildReview(moves, positions, [{ fen: moves[1].before, ply: 1, cpuMove: 'f7f6', suggestedReply: 'e4e5', estimatedLossCp: 220 }])
     expect(review.entries[1].opportunity).toBe('used')
+    expect(annotationForMove(review.entries, 2)).toBe('!!')
     expect(review.used).toBe(1)
   })
 })

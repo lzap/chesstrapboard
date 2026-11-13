@@ -19,6 +19,7 @@ export interface ReviewEntry {
 }
 
 export interface GameReview {
+  initialScore: EngineScore | null
   entries: ReviewEntry[]
   generated: number
   used: number
@@ -35,6 +36,21 @@ export function whiteShare(score: EngineScore | null): number {
   if (!score) return 50
   if (score.kind === 'mate') return score.value > 0 ? 100 : 0
   return Math.max(2, Math.min(98, 50 + 48 * Math.tanh(score.value / 400)))
+}
+
+export function annotationForMove(entries: ReviewEntry[], index: number): string {
+  const entry = entries[index]
+  if (!entry) return ''
+  const previous = entries[index - 1]
+  if (previous?.opportunity === 'used') return entry.grade === 'best' ? '!!' : '!'
+  if (previous?.opportunity === 'partial') return '!?'
+  switch (entry.grade) {
+    case 'best': return previous?.grade === 'mistake' || previous?.grade === 'blunder' ? '!' : ''
+    case 'inaccuracy': return '?!'
+    case 'mistake': return '?'
+    case 'blunder': return '??'
+    default: return ''
+  }
 }
 
 function gradeLoss(loss: number | null): Grade {
@@ -94,7 +110,8 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
     if (outcome === 'used') used += 1
     if (outcome === 'missed') missed += 1
   }
-  return { entries, generated: opportunities.length, used, missed }
+  const initial = positions[0]?.lines.find((line) => line.rank === 1)
+  return { initialScore: initial ? scoreForWhite(initial.score, positions[0].rootTurn) : null, entries, generated: opportunities.length, used, missed }
 }
 
 export async function analyzeGame(

@@ -4,7 +4,9 @@ A static opening trainer for beginners. GitHub Actions builds the site for GitHu
 
 The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** plays a full game against a self-hosted Stockfish.js WebAssembly engine. Difficulty presets change the normal thinking budget. A separate Off/Rare/Sometimes/Often control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns; a size control selects the intended advantage range. If no suitable move is found, the CPU plays normally. A lower thinking budget can still lead to ordinary engine errors.
 
-Explore traps hides evaluations during play. When the game ends, the browser analyzes the moves, shows an evaluation bar, grades approximate move losses, and reviews generated opportunities. Select any reviewed move to replay its position and see the engine's suggested line. Review can take time on a long game and can be cancelled. PGN remains copyable throughout. An optional opportunity chime can cue a validated deliberate CPU mistake during play; grades and suggested lines remain in the postgame review.
+The evaluation panel is always visible. Its score and bar stay blank during play by default; **Show evaluation during play** starts a separate, self-hosted engine Worker and displays an estimate for the viewed position. Explore traps still waits until the game ends to grade moves and explain opportunities. Its cancellable postgame review adds `?!`, `?`, `??`, `!`, and `!!` marks to the same clickable move list, with the engine's suggested line shown for the selected move. An optional opportunity chime can cue a validated deliberate CPU mistake during play.
+
+Click a move to replay it. The mouse wheel over the board, move list, or review panel steps through positions; Left/Right arrow keys step one played move, and Up/Down keys step two. Return to the latest position to resume play. **Copy PGN** copies the complete game without showing a notation box.
 
 The gentle move tap and two-note opportunity chime are synthesized locally with Web Audio. Each has its own toggle, both are off by default, and they share a volume control. No sound file is downloaded.
 
@@ -27,7 +29,7 @@ The Vite base path is `/chesstrapboard/` for project Pages. The deploy workflow 
 
 The opening snapshot in `data/upstream/` is pinned to [Lichess chess-openings commit `3ba6b20`](https://github.com/lichess-org/chess-openings/commit/3ba6b20d31b2e6125cb0e6a2e792f400717d9d39). The browser-ready `public/data/openings.json` is committed. Refresh it deliberately with `npm run prepare:data`; CI checks it with `npm run verify:data`. The served file is about 736 KB raw and 93 KB with gzip. The browser never fetches from Lichess.
 
-The engine's matching Worker and WASM files are committed under `public/engine/`. The browser loads them from this site when Explore traps starts. Their exact release, checksums, GPL-3.0 license, and corresponding source are recorded in [public/engine/SOURCE.md](public/engine/SOURCE.md). This repository's MIT license covers our own application code; the engine remains GPL-3.0.
+The engine's matching Worker and WASM files are committed under `public/engine/`. The browser loads them from this site when Explore traps or optional live evaluation starts. Their exact release, checksums, GPL-3.0 license, and corresponding source are recorded in [public/engine/SOURCE.md](public/engine/SOURCE.md). This repository's MIT license covers our own application code; the engine remains GPL-3.0.
 
 ## Licenses and credits
 

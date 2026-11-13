@@ -10,7 +10,7 @@ body { margin: 0; min-width: 320px; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
-button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px solid #ebc878; outline-offset: 2px; }
+button:focus-visible, a:focus-visible { outline: 3px solid #ebc878; outline-offset: 2px; }
 a { color: #d9bb78; }
 .page { min-height: 100vh; background: radial-gradient(circle at 50% -10%, #304234 0, #17221b 46%); }
 .site-header, .play-layout, footer { max-width: 1440px; margin: auto; }
@@ -95,15 +95,22 @@ a { color: #d9bb78; }
 .empty-state { color: #aab7aa; font-size: 12px; line-height: 1.5; }
 .move-row { display: grid; grid-template-columns: 35px 1fr 1fr; align-items: center; min-height: 31px; padding: 0 8px; border-radius: 6px; font-size: 13px; }
 .move-row:nth-child(odd) { background: #ffffff0b; }
-.move-row span { color: #8fa18e; }
+.move-number { color: #8fa18e; }
+.move-row button { width: 100%; border: 0; border-radius: 5px; background: transparent; color: #d8e4d4; text-align: left; padding: 5px 4px; font-size: 12px; }
+.move-row button:hover, .move-row button[aria-current="true"] { background: #4c654a; color: #fff3d0; }
+.move-row button.grade-inaccuracy { color: #edd595; }
+.move-row button.grade-mistake { color: #edb27d; }
+.move-row button.grade-blunder { color: #efa399; }
+.move-row button.grade-opportunity { color: #e4cb88; font-weight: 800; }
 .pgn-panel { border-top: 1px solid #ffffff20; padding-top: 17px; }
-.pgn-panel label { display: block; font-weight: 700; font-size: 12px; margin-bottom: 8px; }
-.pgn-panel textarea { width: 100%; height: 112px; resize: vertical; border: 1px solid #60755f; background: #17231b; color: #dce5d8; border-radius: 8px; padding: 10px; font: 11px/1.5 ui-monospace, monospace; }
-.pgn-panel .button { margin-top: 9px; width: 100%; }
+.pgn-panel .button { width: 100%; }
+#copy-feedback { display: block; color: #bdcabb; font-size: 11px; margin-top: 8px; }
+#copy-feedback:empty { display: none; }
 .review-panel { border-top: 1px solid #ffffff20; margin-top: 20px; padding-top: 17px; }
 .review-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .review-heading h3 { font-family: Georgia, serif; font-weight: 400; font-size: 24px; margin: 0; }
 .review-progress, .review-summary { color: #bdcabb; font-size: 11px; line-height: 1.5; }
+.review-progress:empty, .review-summary:empty { display: none; }
 .review-panel progress { width: 100%; height: 9px; accent-color: #d9bb78; }
 .evaluation { display: flex; align-items: center; gap: 14px; border: 1px solid #ffffff24; background: #17231b; border-radius: 9px; padding: 11px; margin: 12px 0; }
 .eval-track { width: 24px; height: 92px; flex: 0 0 24px; background: #303832; border: 1px solid #9cae9b; border-radius: 3px; display: flex; align-items: end; overflow: hidden; }
@@ -114,13 +121,9 @@ a { color: #d9bb78; }
 .review-navigation { display: flex; justify-content: space-between; align-items: center; gap: 5px; }
 .review-navigation .button { padding: 7px; font-size: 10px; }
 .review-navigation span { font-size: 10px; text-align: center; color: #d2ddce; }
+.navigation-help { color: #9eae9e; font-size: 10px; margin: 9px 0 0; text-align: center; }
 .review-detail { min-height: 55px; margin: 12px 0; color: #d1dfcd; font-size: 11px; line-height: 1.55; }
-.review-list { max-height: 280px; overflow-y: auto; display: grid; gap: 4px; }
-.review-row { text-align: left; width: 100%; border: 1px solid #ffffff1a; color: #e7eee1; background: #26372b; border-radius: 7px; padding: 8px; font-size: 11px; }
-.review-row:hover, .review-row[aria-current="true"] { border-color: #d9bb78; background: #3b5039; }
-.grade-inaccuracy { color: #edd595; }
-.grade-mistake { color: #edb27d; }
-.grade-blunder { color: #efa399; }
+#review-live { display: block; margin: 6px 0 0 auto; }
 .promotion { position: absolute; inset: 0; z-index: 5; background: #142117dd; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .promotion p { font-weight: 700; }
 .promotion > div { display: flex; gap: 8px; }
