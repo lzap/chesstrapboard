@@ -41,6 +41,15 @@ export class TrainingSession {
     return Math.max(this.opening.moves.length, this.book.longestLinePly(this.chess))
   }
 
+  bookMovesAt(position: Chess): string[] {
+    const choices = new Set(this.book.moves(position))
+    const history = position.history({ verbose: true }).map(toUci)
+    const selected = this.opening.moves[history.length]
+    if (selected && history.every((move, index) => move === this.opening.moves[index])
+      && position.moves({ verbose: true }).some((move) => toUci(move) === selected)) choices.add(selected)
+    return [...choices]
+  }
+
   get opportunityChecks(): number {
     return this.opportunityCheckPlies.length
   }

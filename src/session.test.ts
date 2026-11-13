@@ -29,6 +29,17 @@ function bookFromLines(lines: string[][]): OpeningBook {
 }
 
 describe('opening-guided full game', () => {
+  it('offers every legal database move and the selected line in current or historical positions', () => {
+    const book = bookFromLines([italian.moves, ['d2d4', 'd7d5']])
+    const session = new TrainingSession(italian, 'w', book)
+    expect(session.bookMovesAt(session.chess)).toEqual(['e2e4', 'd2d4'])
+    session.playPlayer({ from: 'd2', to: 'd4' })
+    expect(session.bookActive).toBe(false)
+    expect(session.bookMovesAt(session.chess)).toEqual(['d7d5'])
+    expect(session.bookMovesAt(new Chess())).toEqual(['e2e4', 'd2d4'])
+    expect(new TrainingSession(italian, 'w', emptyBook).bookMovesAt(new Chess())).toEqual(['e2e4'])
+  })
+
   it('follows the selected line and continues after the named position', () => {
     const session = new TrainingSession(italian, 'w', emptyBook)
     expect(session.playPlayer({ from: 'e2', to: 'e4' })?.san).toBe('e4')

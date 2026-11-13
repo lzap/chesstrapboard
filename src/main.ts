@@ -35,6 +35,7 @@ let evaluationToken = 0
 let hintMove: MoveInput | null = null
 let hintSearching = false
 let hintToken = 0
+let bookHints: { fen: string; moves: string[]; index: number } | null = null
 let linePreview: { session: TrainingSession; ply: number; positions: Chess[]; step: number } | null = null
 let linePreviewTimer: number | null = null
 const evaluationCache = new Map<string, EngineScore | null>()
@@ -110,6 +111,18 @@ function clearHint(): void {
   if (hintSearching) engine.stop()
   hintMove = null
   hintSearching = false
+  bookHints = null
+}
+
+function shuffledMoves(moves: string[]): string[] {
+  const shuffled = [...moves]
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(Math.random() * (index + 1))
+    const value = shuffled[index]
+    shuffled[index] = shuffled[other]
+    shuffled[other] = value
+  }
+  return shuffled
 }
 
 async function evaluateVisiblePosition(): Promise<void> {
@@ -269,15 +282,23 @@ function difficultyBudget(): number {
 async function revealHint(): Promise<void> {
   const current = session
   if (!current || hintSearching || thinking || reviewing) return
+  const position = positionAt(positionPly())
+  const viewingHistory = positionPly() < current.chess.history().length
+  if (position.isGameOver() || (!viewingHistory && !current.isPlayerTurn)) return
+  const fen = position.fen()
+  const bookMoves = current.bookMovesAt(position)
+  if (bookMoves.length) {
+    if (!bookHints || bookHints.fen !== fen) bookHints = { fen, moves: shuffledMoves(bookMoves), index: 0 }
+    else bookHints.index = (bookHints.index + 1) % bookHints.moves.length
+    hintMove = fromUci(bookHints.moves[bookHints.index])
+    render()
+    return
+  }
   if (hintMove) {
     clearHint()
     render()
     return
   }
-  const position = positionAt(positionPly())
-  const viewingHistory = positionPly() < current.chess.history().length
-  if (position.isGameOver() || (!viewingHistory && !current.isPlayerTurn)) return
-  const fen = position.fen()
   const token = ++hintToken
   hintSearching = true
   render()
@@ -572,8 +593,14 @@ function render(): void {
   element<HTMLButtonElement>('#copy-button').disabled = !session || moves.length === 0
   const hintButton = element<HTMLButtonElement>('#hint-button')
   hintButton.disabled = !session || thinking || reviewing || hintSearching || visiblePosition.isGameOver() || (!viewingHistory && !session.isPlayerTurn)
-  hintButton.textContent = hintSearching ? 'Thinking…' : hintMove ? 'Hide hint' : 'Hint'
-  hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
+  hintButton.textContent = hintSearching ? 'Thinking…' : bookHints && hintMove ? `Hint ${bookHints.index + 1}/${bookHints.moves.length}` : hintMove ? 'Hide hint' : 'Hint'
+  if (bookHints && hintMove) {
+    hintButton.removeAttribute('aria-pressed')
+    hintButton.setAttribute('aria-label', `Opening hint ${bookHints.index + 1} of ${bookHints.moves.length}; show next`)
+  } else {
+    hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
+    hintButton.removeAttribute('aria-label')
+  }
   element<HTMLButtonElement>('#finish-button').disabled = !session || reviewing || session.completed && Boolean(review)
   element<HTMLButtonElement>('#take-back-button').disabled = !session?.canTakeBack
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn

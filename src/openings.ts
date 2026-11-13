@@ -56,11 +56,15 @@ export class OpeningBook {
     return this.positions.get(positionKey(chess))?.maxPly ?? 0
   }
 
-  pickMove(chess: Chess, random = Math.random): string | null {
+  moves(chess: Chess): string[] {
     const entry = this.positions.get(positionKey(chess))
-    if (!entry) return null
+    if (!entry) return []
     const legal = new Set(chess.moves({ verbose: true }).map(toUci))
-    const candidates = entry.choices.filter((move) => legal.has(move))
+    return [...new Set(entry.choices)].filter((move) => legal.has(move))
+  }
+
+  pickMove(chess: Chess, random = Math.random): string | null {
+    const candidates = this.moves(chess)
     return candidates[Math.floor(random() * candidates.length)] ?? null
   }
 }
