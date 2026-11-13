@@ -2,7 +2,8 @@ import { Chess, type Color } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus } from './chess'
 import { EngineClient } from './engine'
-import { fromUci, loadOpenings, openingSan, searchOpenings, toUci, type Opening } from './openings'
+import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, toUci, type Opening } from './openings'
+import { analyzeGame, formatScore, whiteShare, type GameReview } from './review'
 import { TrainingSession, type Mode } from './session'
 import { findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
@@ -20,6 +21,12 @@ let mode: Mode = 'memorize'
 let thinking = false
 let engineError = false
 let generation = 0
+let review: GameReview | null = null
+let reviewing = false
+let reviewDone = 0
+let reviewTotal = 0
+let reviewError = ''
+let reviewIndex: number | null = null
 const engine = new EngineClient()
 
 function savePreferences(): void {
@@ -56,7 +63,10 @@ const board = new BoardView(element('#board-container'), (input) => {
   if (!session) return
   const move = session.playPlayer(input)
   render()
-  if (move && mode === 'traps') void runCpu()
+  if (move && mode === 'traps') {
+    if (session.completed) void runReview()
+    else void runCpu()
+  }
 })
 
 function invalidateGame(): void {
@@ -64,6 +74,12 @@ function invalidateGame(): void {
   engine.stop()
   thinking = false
   engineError = false
+  reviewing = false
+  review = null
+  reviewDone = 0
+  reviewTotal = 0
+  reviewError = ''
+  reviewIndex = null
 }
 
 function difficultyBudget(): number {
@@ -76,6 +92,7 @@ async function runCpu(): Promise<void> {
   if (!current || current.mode !== 'traps' || !current.isCpuTurn) return
   if (current.advanceBook()) {
     render()
+    if (current.completed) void runReview()
     return
   }
   const token = generation
@@ -107,12 +124,49 @@ async function runCpu(): Promise<void> {
     if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
     if (candidate) current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
     render()
+    if (current.completed) void runReview()
   } catch (error) {
     if (token !== generation || current !== session) return
     thinking = false
     engineError = true
     engine.terminate()
     current.feedback = error instanceof Error ? error.message : 'Engine failed to move'
+    render()
+  }
+}
+
+async function runReview(): Promise<void> {
+  const current = session
+  if (!current || current.mode !== 'traps' || !current.completed) return
+  const token = generation
+  reviewing = true
+  review = null
+  reviewError = ''
+  reviewDone = 0
+  reviewTotal = current.chess.history().length + 1
+  reviewIndex = current.chess.history().length
+  render()
+  try {
+    const result = await analyzeGame(
+      current.chess,
+      (fen, milliseconds) => engine.search(fen, milliseconds),
+      current.opportunities,
+      (done, total) => {
+        if (token !== generation || current !== session) return
+        reviewDone = done
+        reviewTotal = total
+        renderReview()
+      },
+      () => token !== generation || current !== session,
+    )
+    if (token !== generation || current !== session) return
+    review = result
+    reviewing = false
+    render()
+  } catch (error) {
+    if (token !== generation || current !== session) return
+    reviewing = false
+    reviewError = error instanceof Error ? error.message : 'Review failed'
     render()
   }
 }
@@ -188,10 +242,65 @@ function renderModeControls(): void {
   element<HTMLButtonElement>('#start-button').textContent = mode === 'memorize' ? 'Start practice' : 'Start game'
 }
 
+function renderReview(): void {
+  const panel = element<HTMLElement>('#review-panel')
+  panel.hidden = !session || session.mode !== 'traps' || !session.completed
+  if (panel.hidden || !session) return
+  element<HTMLElement>('#review-progress').textContent = reviewing
+    ? `Analyzing ${reviewDone} of ${reviewTotal} positions…`
+    : reviewError || (review ? 'Review complete. Select a move to inspect it.' : 'Ready to analyze.')
+  const meter = element<HTMLProgressElement>('#review-meter')
+  meter.hidden = !reviewing
+  meter.value = reviewTotal ? Math.round(reviewDone / reviewTotal * 100) : 0
+  element<HTMLButtonElement>('#cancel-review').hidden = !reviewing
+  element<HTMLButtonElement>('#review-button').hidden = reviewing
+  const actualOpening = classifyGame(session.chess, openings)
+  element<HTMLElement>('#review-summary').textContent = review
+    ? `${session.openingReached ? 'Target opening reached.' : `Target opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${review.generated} generated opportunity ${review.generated === 1 ? 'attempt' : 'attempts'}; ${review.used} used, ${review.missed} missed. Scores are estimates.`
+    : ''
+  const position = reviewIndex ?? session.chess.history().length
+  const entry = review?.entries[position - 1]
+  const score = entry?.whiteScore ?? null
+  element<HTMLElement>('#eval-white').style.height = `${whiteShare(score)}%`
+  element<HTMLElement>('#eval-label').textContent = formatScore(score)
+  element<HTMLElement>('.eval-track').setAttribute('aria-label', `Evaluation after selected move: ${formatScore(score)} from White's perspective`)
+  element<HTMLElement>('#review-position').textContent = position === 0 ? 'Starting position' : `Move ${position} of ${session.chess.history().length}`
+  element<HTMLButtonElement>('#review-prev').disabled = !review || position === 0
+  element<HTMLButtonElement>('#review-next').disabled = !review || position >= session.chess.history().length
+  const detail = element<HTMLElement>('#review-detail')
+  if (!review) detail.textContent = ''
+  else if (!entry) detail.textContent = 'Starting position. Choose a move to see its engine review.'
+  else {
+    const moveLabel = `${Math.floor((position + 1) / 2)}${entry.color === 'w' ? '.' : '...'} ${entry.san}`
+    const best = entry.bestSan ? ` Best move: ${entry.bestSan}.` : ''
+    const line = entry.bestLine ? ` Suggested line: ${entry.bestLine}.` : ''
+    const opportunity = entry.opportunity ? ` Engine-generated opportunity: ${entry.opportunity.replace('-', ' ')}.` : ''
+    detail.textContent = `${moveLabel} · ${entry.grade}${entry.lossCp === null ? '' : ` · about ${(entry.lossCp / 100).toFixed(1)} pawns lost`}.${best}${line}${opportunity}`
+  }
+  const list = element<HTMLDivElement>('#review-list')
+  list.replaceChildren()
+  if (!review) return
+  for (const item of review.entries) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = `review-row grade-${item.grade}`
+    button.setAttribute('aria-current', String(position === item.ply + 1))
+    const moveLabel = `${Math.floor(item.ply / 2) + 1}${item.color === 'w' ? '.' : '...'} ${item.san}`
+    button.textContent = `${moveLabel} · ${item.grade}${item.opportunity ? ` · opportunity ${item.opportunity}` : ''}`
+    button.addEventListener('click', () => { reviewIndex = item.ply + 1; render() })
+    list.append(button)
+  }
+}
+
 function render(): void {
   renderModeControls()
   const chess = session?.chess ?? previewChess
-  board.update(chess, orientation, session?.playerColor ?? null, Boolean(session?.isPlayerTurn) && !thinking)
+  let boardChess = chess
+  if (session?.mode === 'traps' && session.completed && reviewIndex !== null) {
+    boardChess = new Chess()
+    for (const move of session.chess.history({ verbose: true }).slice(0, reviewIndex)) boardChess.move({ from: move.from, to: move.to, promotion: move.promotion })
+  }
+  board.update(boardChess, orientation, session?.playerColor ?? null, Boolean(session?.isPlayerTurn) && !thinking)
   element<HTMLElement>('#status').textContent = session?.completed
     ? session.mode === 'memorize' ? 'Opening line complete' : session.finishReason ? 'Game ended' : gameStatus(chess)
     : thinking ? 'Computer is thinking…' : session ? gameStatus(chess) : 'Choose an opening to begin'
@@ -202,7 +311,7 @@ function render(): void {
       : session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game'
     : 'Select an opening to begin'
   const hint = mode === 'memorize' && session?.isPlayerTurn && element<HTMLInputElement>('#hint-toggle').checked ? expectedSan(session) : null
-  element<HTMLElement>('#feedback').textContent = session?.feedback || (hint ? `Next move: ${hint}` : thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : session ? mode === 'memorize' ? 'Follow the line. A different move will be corrected immediately.' : 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
+  element<HTMLElement>('#feedback').textContent = session?.feedback || (hint ? `Next move: ${hint}` : thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed && mode === 'traps' ? 'Game finished. Review the moves below.' : session ? mode === 'memorize' ? 'Follow the line. A different move will be corrected immediately.' : 'Play the whole game. Review comes after it ends.' : loadError || 'Choose an opening to begin.')
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
   const moveList = element<HTMLDivElement>('#move-list')
@@ -232,6 +341,7 @@ function render(): void {
   element<HTMLButtonElement>('#finish-button').disabled = !session || session.completed
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = !selectedOpening
+  renderReview()
 }
 
 function startPractice(): void {
@@ -270,8 +380,25 @@ element<HTMLButtonElement>('#finish-button').addEventListener('click', () => {
   invalidateGame()
   session?.finish('stopped')
   render()
+  void runReview()
 })
 element<HTMLButtonElement>('#retry-cpu-button').addEventListener('click', () => void runCpu())
+element<HTMLButtonElement>('#review-button').addEventListener('click', () => void runReview())
+element<HTMLButtonElement>('#cancel-review').addEventListener('click', () => {
+  generation += 1
+  engine.stop()
+  reviewing = false
+  reviewError = 'Review cancelled. You can analyze again.'
+  render()
+})
+element<HTMLButtonElement>('#review-prev').addEventListener('click', () => {
+  reviewIndex = Math.max(0, (reviewIndex ?? 0) - 1)
+  render()
+})
+element<HTMLButtonElement>('#review-next').addEventListener('click', () => {
+  reviewIndex = Math.min(session?.chess.history().length ?? 0, (reviewIndex ?? 0) + 1)
+  render()
+})
 document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio) => radio.addEventListener('change', () => {
   invalidateGame()
   playerColor = radio.value as Color

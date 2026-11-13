@@ -50,6 +50,17 @@
           <div class="panel-heading"><div><p class="eyebrow">GAME RECORD</p><h2>Moves</h2></div><span id="move-count" class="move-count">0 moves</span></div>
           <div id="move-list" class="move-list"></div>
           <div class="pgn-panel"><label for="pgn">PGN notation</label><textarea id="pgn" readonly spellcheck="false"></textarea><button type="button" id="copy-button" class="button button-secondary">Copy PGN</button></div>
+          <section id="review-panel" class="review-panel" aria-label="Postgame review" hidden>
+            <div class="review-heading"><h3>Game review</h3><button type="button" id="review-button" class="text-button">Analyze again</button></div>
+            <p id="review-progress" class="review-progress" role="status" aria-live="polite"></p>
+            <progress id="review-meter" max="100" value="0" hidden></progress>
+            <button type="button" id="cancel-review" class="text-button" hidden>Cancel review</button>
+            <p id="review-summary" class="review-summary"></p>
+            <div class="evaluation"><div class="eval-track" role="img" aria-label="Position evaluation"><div id="eval-white"></div></div><div><span class="eval-caption">EVALUATION</span><strong id="eval-label">—</strong><small>White's perspective</small></div></div>
+            <div class="review-navigation"><button type="button" id="review-prev" class="button button-secondary">← Previous</button><span id="review-position">Final position</span><button type="button" id="review-next" class="button button-secondary">Next →</button></div>
+            <div id="review-detail" class="review-detail"></div>
+            <div id="review-list" class="review-list"></div>
+          </section>
         </aside>
       </main>
       <footer>Made for thoughtful opening practice · <a href="https://github.com/lzap/chesstrapboard/blob/main/THIRD_PARTY_NOTICES.md">Licenses and credits</a></footer>

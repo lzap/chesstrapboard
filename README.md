@@ -2,7 +2,9 @@
 
 A static opening trainer for beginners. The site is built with GitHub Actions and published with GitHub Pages at <https://lzap.github.io/chesstrapboard/>.
 
-The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** plays a full game against a self-hosted Stockfish.js WebAssembly engine. Difficulty presets change the normal thinking budget. A separate Off/Rare/Sometimes/Often control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns; a size control selects the intended advantage range. If no suitable move is found, the CPU plays normally. A lower thinking budget can still lead to ordinary engine errors. Postgame review will be added in the next commit before publication.
+The board supports **Memorize lines**: choose one of 3,865 Lichess opening lines, play either side, receive immediate correction, and copy the PGN. **Explore traps** plays a full game against a self-hosted Stockfish.js WebAssembly engine. Difficulty presets change the normal thinking budget. A separate Off/Rare/Sometimes/Often control sets the chance of attempting a deliberate, plausible mistake on eligible CPU turns; a size control selects the intended advantage range. If no suitable move is found, the CPU plays normally. A lower thinking budget can still lead to ordinary engine errors.
+
+Explore traps hides evaluations during play. When the game ends, the browser analyzes the moves, shows an evaluation bar, grades approximate move losses, and reviews generated opportunities. Select any reviewed move to replay its position and see the engine's suggested line. Review can take time on a long game and can be cancelled. PGN remains copyable throughout.
 
 ## Development
 
