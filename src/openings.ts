@@ -65,7 +65,13 @@ export class OpeningBook {
 
   pickMove(chess: Chess, random = Math.random): string | null {
     const candidates = this.moves(chess)
-    return candidates[Math.floor(random() * candidates.length)] ?? null
+    const continuing = candidates.filter((move) => {
+      const after = new Chess(chess.fen())
+      after.move(fromUci(move))
+      return after.isGameOver() || this.hasContinuation(after)
+    })
+    const choices = continuing.length ? continuing : candidates
+    return choices[Math.floor(random() * choices.length)] ?? null
   }
 }
 

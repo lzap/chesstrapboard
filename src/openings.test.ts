@@ -32,4 +32,21 @@ describe('optional opening selection', () => {
     expect(book.moves(transposed)).toEqual(['g1f3'])
     expect(book.pickMove(transposed)).toBe('g1f3')
   })
+
+  it('prefers book moves that keep a line going while retaining variety', () => {
+    const position = new Chess()
+    position.move('d4')
+    const afterD5 = new Chess(position.fen())
+    afterD5.move('d5')
+    const afterNf6 = new Chess(position.fen())
+    afterNf6.move('Nf6')
+    const book = new OpeningBook([
+      [positionKey(position), ['b8a6', 'd7d5', 'g8f6'], 8],
+      [positionKey(afterD5), ['c2c4'], 8],
+      [positionKey(afterNf6), ['c2c4'], 8],
+    ])
+    expect(book.pickMove(position, () => 0)).toBe('d7d5')
+    expect(book.pickMove(position, () => 0.99)).toBe('g8f6')
+    expect(book.moves(position)).toEqual(['b8a6', 'd7d5', 'g8f6'])
+  })
 })

@@ -541,7 +541,7 @@ function render(): void {
   boardHint.classList.toggle('opportunity-cue', showOpportunityCue)
   boardHint.textContent = viewingHistory ? 'History' : showOpportunityCue
     ? 'Possible opportunity · find your best reply'
-    : session ? session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game' : session.hasBookContinuation ? 'Following opening' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
+    : session ? session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game' : session.bookActive ? 'Following opening' : session.hasBookContinuation ? 'Following database' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`

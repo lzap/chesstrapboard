@@ -81,6 +81,18 @@ describe('opening-guided full game', () => {
     expect(session.playPlayer({ from: 'c2', to: 'c4' })).toBeNull()
   })
 
+  it('continues another opening after the selected line is left', () => {
+    const book = bookFromLines([['d2d4', 'b8a6'], ['d2d4', 'd7d5', 'c2c4']])
+    const session = new TrainingSession(italian, 'w', book)
+    expect(session.playPlayer({ from: 'd2', to: 'd4' })?.san).toBe('d4')
+    expect(session.bookActive).toBe(false)
+    expect(session.hasBookContinuation).toBe(true)
+    expect(session.advanceBook()?.san).toBe('d5')
+    expect(session.hasBookContinuation).toBe(true)
+    expect(session.playPlayer({ from: 'c2', to: 'c4' })?.san).toBe('c4')
+    expect(session.advanceBook()).toBeNull()
+  })
+
   it('continues a C33 database line after the selected opening name ends', () => {
     const base: Opening = { id: 3, eco: 'C33', name: "King's Gambit Accepted", moves: ['e2e4', 'e7e5', 'f2f4', 'e5f4'], position: '' }
     const longer = [...base.moves, 'f1c4', 'g7g5']
