@@ -5,6 +5,7 @@ import { EngineClient, scoreForWhite, type EngineScore, type SearchResult } from
 import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, toUci, type Opening } from './openings'
 import { buildReview, formatScore, moveAnnotation, reviewBudget, reviewPositions, ReviewSearchCache, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
+import { parseLinkSettings, resolveLinkOpening, shareSearch, type Difficulty } from './share'
 import { GameSounds } from './sound'
 import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, findMateReply, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
@@ -19,6 +20,7 @@ let session: TrainingSession | null = null
 let playerColor: Color = 'w'
 let orientation: Color = 'w'
 let loadError = ''
+let shareError = ''
 let thinking = false
 let engineError = false
 let generation = 0
@@ -124,6 +126,21 @@ function savePreferences(): void {
       volume: element<HTMLInputElement>('#sound-volume').value,
     }))
   } catch { /* Preferences remain usable for this session. */ }
+  try {
+    const query = shareSearch(window.location.search, {
+      opening: selectedOpening,
+      side: playerColor,
+      difficulty: element<HTMLSelectElement>('#difficulty').value as Difficulty,
+      frequency: element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency,
+      size: element<HTMLSelectElement>('#mistake-size').value as MistakeSize,
+      evaluation: element<HTMLInputElement>('#evaluation-toggle').checked,
+    })
+    if (query !== window.location.search.slice(1)) {
+      const url = new URL(window.location.href)
+      url.search = query
+      window.history.replaceState(null, '', url)
+    }
+  } catch { /* The game still works if URL updates are unavailable. */ }
 }
 
 function restorePreferences(): [string, string] | null {
@@ -525,6 +542,7 @@ function renderOpeningResults(): void {
     button.append(code, name)
     button.addEventListener('click', () => {
       invalidateGame()
+      shareError = ''
       selectedOpening = opening
       session = null
       savePreferences()
@@ -542,6 +560,7 @@ function renderOpeningSelection(): void {
   panel.replaceChildren()
   if (!selectedOpening) {
     if (loadError) panel.textContent = loadError
+    else if (shareError) panel.textContent = shareError
     else if (!openings.length) panel.textContent = 'Loading opening names…'
     else if (!session) panel.textContent = 'No opening selected · computer will choose at random.'
     else panel.textContent = `Random opening: ${session.opening.eco} · ${session.opening.name}`
@@ -557,6 +576,7 @@ function renderOpeningSelection(): void {
     clear.textContent = 'Clear opening'
     clear.addEventListener('click', () => {
       invalidateGame()
+      shareError = ''
       selectedOpening = null
       session = null
       savePreferences()
@@ -692,6 +712,8 @@ function startGame(initialMove?: MoveInput, startAtOpening = false): void {
   if (!opening) return
   invalidateGame()
   session = new TrainingSession(opening, playerColor, openingBook, startAtOpening)
+  shareError = ''
+  savePreferences()
   orientation = playerColor
   sounds.activate()
   if (session.chess.history().length) sounds.playAfterMove(session.chess)
@@ -759,6 +781,7 @@ element<HTMLButtonElement>('#review-next').addEventListener('click', () => {
 })
 document.querySelectorAll<HTMLInputElement>('input[name="side"]').forEach((radio) => radio.addEventListener('change', () => {
   invalidateGame()
+  shareError = ''
   playerColor = radio.value as Color
   session = null
   orientation = playerColor
@@ -821,15 +844,38 @@ element<HTMLElement>('#review-detail').addEventListener('pointerenter', previewS
 element<HTMLElement>('#review-detail').addEventListener('pointermove', previewSuggestedLine)
 element<HTMLElement>('#review-detail').addEventListener('pointerleave', restoreSuggestedLine)
 
+const linkSettings = parseLinkSettings(window.location.search)
 const savedOpening = restorePreferences()
+if (linkSettings.requested) {
+  playerColor = 'w'
+  orientation = 'w'
+  element<HTMLInputElement>('input[name="side"][value="w"]').checked = true
+  element<HTMLInputElement>('#evaluation-toggle').checked = false
+  element<HTMLSelectElement>('#difficulty').value = 'intermediate'
+  element<HTMLSelectElement>('#mistake-frequency').value = 'almostAlways'
+  element<HTMLSelectElement>('#mistake-size').value = 'large'
+}
+if (linkSettings.side) {
+  playerColor = linkSettings.side
+  orientation = playerColor
+  element<HTMLInputElement>(`input[name="side"][value="${playerColor}"]`).checked = true
+}
+if (linkSettings.difficulty) element<HTMLSelectElement>('#difficulty').value = linkSettings.difficulty
+if (linkSettings.frequency) element<HTMLSelectElement>('#mistake-frequency').value = linkSettings.frequency
+if (linkSettings.size) element<HTMLSelectElement>('#mistake-size').value = linkSettings.size
+if (linkSettings.evaluation !== null) element<HTMLInputElement>('#evaluation-toggle').checked = linkSettings.evaluation
 render()
 Promise.all([loadOpenings(), loadOpeningBook()]).then(([loaded, book]) => {
   openings = loaded
   openingBook = book
-  selectedOpening = savedOpening ? openings.find((opening) => opening.eco === savedOpening[0] && opening.name === savedOpening[1]) ?? null : null
+  selectedOpening = linkSettings.requested
+    ? linkSettings.openingCode !== null ? resolveLinkOpening(openings, linkSettings.openingCode, linkSettings.openingName) : null
+    : savedOpening ? openings.find((opening) => opening.eco === savedOpening[0] && opening.name === savedOpening[1]) ?? null : null
+  if (linkSettings.openingCode !== null && !selectedOpening) shareError = 'Opening link was not found in this book. Choose an opening below.'
   renderOpeningResults()
   renderOpeningSelection()
   render()
+  if (linkSettings.requested && !shareError) startGame()
 }).catch((error: unknown) => {
   loadError = error instanceof Error ? error.message : 'Opening names could not be loaded.'
   renderOpeningSelection()

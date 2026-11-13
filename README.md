@@ -9,6 +9,28 @@ A static opening trainer for beginners. GitHub Actions builds the site for GitHu
 - Finish with **End game**, or play to a natural ending. While you think, a separate engine Worker quietly analyzes reached positions with a fixed budget and stops when they are covered. The game record appears immediately at the end; any positions missed during fast play fill in quietly afterward. Review the evaluation and suggested line; move across the line to preview it on the board. Sparse `!`, `!!`, `?`, and `??` marks highlight clear engine findings. An underlined CPU move marks an opportunity; its reply always gets `!` or `?` instead of a general mark.
 - Use **Take back** to redo your last move and any CPU reply. Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.
 
+## Share a training link
+
+Links can set `opening` (an ECO code), optional exact `name`, `side=white` or `side=black`, `difficulty=beginner|intermediate|strong`, `frequency=off|rare|sometimes|often|almostAlways`, `size=mild|medium|large`, and `evaluation=on|off`. A valid link starts the game as soon as the opening data loads, using the app defaults for any omitted training setting. Without `name`, the app chooses a representative line for that ECO code. Changing settings updates the address bar, so you can copy its URL to share the current setup.
+
+These ten tactical openings are in the committed Lichess snapshot. They are practice starting points; a trap or forced mate still depends on the moves played and the engine's search.
+
+### Play as White
+
+- [C57 Italian Game: Two Knights Defense, Fried Liver Attack](https://lukas.zapletalovi.com/chesstrapboard/?opening=C57&name=Italian+Game%3A+Two+Knights+Defense%2C+Fried+Liver+Attack&side=white)
+- [C21 Danish Gambit Accepted](https://lukas.zapletalovi.com/chesstrapboard/?opening=C21&name=Danish+Gambit+Accepted&side=white)
+- [B21 Sicilian Defense: Smith-Morra Gambit Accepted](https://lukas.zapletalovi.com/chesstrapboard/?opening=B21&name=Sicilian+Defense%3A+Smith-Morra+Gambit+Accepted&side=white)
+- [C47 Four Knights Game: Halloween Gambit](https://lukas.zapletalovi.com/chesstrapboard/?opening=C47&name=Four+Knights+Game%3A+Halloween+Gambit&side=white)
+- [D00 Blackmar-Diemer Gambit Accepted: Ryder Gambit](https://lukas.zapletalovi.com/chesstrapboard/?opening=D00&name=Blackmar-Diemer+Gambit+Accepted%3A+Ryder+Gambit&side=white)
+
+### Play as Black
+
+- [C42 Petrov's Defense: Stafford Gambit](https://lukas.zapletalovi.com/chesstrapboard/?opening=C42&name=Petrov%27s+Defense%3A+Stafford+Gambit&side=black)
+- [C57 Italian Game: Two Knights Defense, Traxler Counterattack](https://lukas.zapletalovi.com/chesstrapboard/?opening=C57&name=Italian+Game%3A+Two+Knights+Defense%2C+Traxler+Counterattack&side=black)
+- [A40 Englund Gambit](https://lukas.zapletalovi.com/chesstrapboard/?opening=A40&name=Englund+Gambit&side=black)
+- [D08 Queen's Gambit Declined: Albin Countergambit, Lasker Trap](https://lukas.zapletalovi.com/chesstrapboard/?opening=D08&name=Queen%27s+Gambit+Declined%3A+Albin+Countergambit%2C+Lasker+Trap&side=black)
+- [C40 Latvian Gambit](https://lukas.zapletalovi.com/chesstrapboard/?opening=C40&name=Latvian+Gambit&side=black)
+
 ## Development
 
 Use Node.js 22.12 or newer.
