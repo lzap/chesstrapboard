@@ -71,6 +71,8 @@ a { color: #d9bb78; }
 .square.last-move.light { background: #e8d68b; }
 .square.last-move.dark { background: #b1b766; }
 .square.selected { box-shadow: inset 0 0 0 5px #f8d876; z-index: 1; }
+.square.hint-from { box-shadow: inset 0 0 0 5px #ffd166; }
+.square.hint-to { box-shadow: inset 0 0 0 5px #52c7eb; }
 .square.legal::after { content: ''; position: absolute; width: 20%; height: 20%; border-radius: 50%; background: #223d3399; }
 .square.legal:has(.piece)::after { width: 82%; height: 82%; background: none; border: 5px solid #223d3399; }
 .piece { font-family: "DejaVu Sans", "Noto Sans Symbols 2", "Segoe UI Symbol", serif; font-size: clamp(27px, 5vw, 57px); line-height: 1; z-index: 1; user-select: none; }
@@ -106,9 +108,10 @@ a { color: #d9bb78; }
 .move-row button.opportunity-reply.opportunity-unconfirmed { text-decoration: underline dotted 2px #aebdad; text-underline-offset: 3px; }
 #opportunity-status { color: #e5cf9b !important; }
 .pgn-panel { border-top: 1px solid #ffffff20; padding-top: 17px; }
-.pgn-panel .button { width: 100%; }
-#copy-feedback { display: block; color: #bdcabb; font-size: 11px; margin-top: 8px; }
-#copy-feedback:empty { display: none; }
+.pgn-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.pgn-actions .button { min-width: 0; }
+#copy-feedback, #hint-feedback { display: block; color: #bdcabb; font-size: 11px; margin-top: 8px; }
+#copy-feedback:empty, #hint-feedback:empty { display: none; }
 .evaluation-panel { margin-bottom: 20px; }
 .review-panel { border-top: 1px solid #ffffff20; margin-top: 20px; padding-top: 17px; }
 #review-button { display: block; margin: 0 0 8px auto; }

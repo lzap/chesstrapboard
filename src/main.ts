@@ -1,6 +1,6 @@
 import { Chess, type Color } from 'chess.js'
 import { BoardView } from './board'
-import { exportPgn, gameStatus } from './chess'
+import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore } from './engine'
 import { classifyGame, fromUci, loadOpenings, openingSan, searchOpenings, type Opening } from './openings'
 import { analyzeGame, annotationForMove, formatScore, whiteShare, type GameReview } from './review'
@@ -31,6 +31,10 @@ let liveEvaluation: { fen: string; score: EngineScore | null } | null = null
 let evaluating = false
 let evaluationError = ''
 let evaluationToken = 0
+let hintMove: MoveInput | null = null
+let hintSearching = false
+let hintFeedback = ''
+let hintToken = 0
 const evaluationCache = new Map<string, EngineScore | null>()
 const engine = new EngineClient()
 const evaluationEngine = new EngineClient()
@@ -98,6 +102,14 @@ function cancelEvaluation(): void {
   evaluationError = ''
 }
 
+function clearHint(): void {
+  hintToken += 1
+  if (hintSearching) engine.stop()
+  hintMove = null
+  hintSearching = false
+  hintFeedback = ''
+}
+
 async function evaluateVisiblePosition(): Promise<void> {
   const current = session
   if (!current || !element<HTMLInputElement>('#evaluation-toggle').checked || review) return
@@ -139,6 +151,7 @@ function navigateTo(ply: number): void {
   const total = session.chess.history().length
   const next = Math.max(0, Math.min(ply, total))
   if (next === positionPly()) return
+  clearHint()
   const focusMove = element<HTMLDivElement>('#move-list').contains(document.activeElement)
   viewPly = next === total ? null : next
   render()
@@ -149,7 +162,10 @@ function navigateTo(ply: number): void {
 const board = new BoardView(element('#board-container'), (input) => {
   if (!session) return
   const move = session.playPlayer(input)
-  if (move) sounds.playMove()
+  if (move) {
+    clearHint()
+    sounds.playMove()
+  }
   render()
   if (move) void evaluateVisiblePosition()
   if (move) {
@@ -159,6 +175,7 @@ const board = new BoardView(element('#board-container'), (input) => {
 })
 
 function invalidateGame(): void {
+  clearHint()
   generation += 1
   engine.stop()
   cancelEvaluation()
@@ -176,6 +193,39 @@ function invalidateGame(): void {
 function difficultyBudget(): number {
   const difficulty = element<HTMLSelectElement>('#difficulty').value
   return difficulty === 'beginner' ? 180 : difficulty === 'strong' ? 1300 : 550
+}
+
+async function revealHint(): Promise<void> {
+  const current = session
+  if (!current || hintSearching || thinking || reviewing) return
+  if (hintMove) {
+    clearHint()
+    render()
+    return
+  }
+  const position = positionAt(positionPly())
+  const viewingHistory = positionPly() < current.chess.history().length
+  if (position.isGameOver() || (!viewingHistory && !current.isPlayerTurn)) return
+  const fen = position.fen()
+  const token = ++hintToken
+  hintSearching = true
+  hintFeedback = 'Finding a suggested move…'
+  render()
+  try {
+    const result = await engine.search(fen, Math.max(1200, difficultyBudget()))
+    if (token !== hintToken || current !== session || positionAt(positionPly()).fen() !== fen) return
+    const move = result.bestMove && tryMove(new Chess(fen), fromUci(result.bestMove))
+    if (!move) throw new Error('No legal suggestion was returned')
+    hintMove = { from: move.from, to: move.to }
+    hintFeedback = `Suggested ${move.san}. Gold marks the start; blue marks the destination.`
+    hintSearching = false
+    render()
+  } catch (error) {
+    if (token !== hintToken || current !== session) return
+    hintSearching = false
+    hintFeedback = `Hint unavailable: ${error instanceof Error ? error.message : 'engine search failed'}`
+    render()
+  }
 }
 
 async function runCpu(): Promise<void> {
@@ -384,9 +434,10 @@ function renderReview(): void {
 function render(): void {
   const chess = session?.chess ?? previewChess
   const position = positionPly()
+  const visiblePosition = positionAt(position)
   const viewingHistory = Boolean(session && position < chess.history().length)
   const opportunityNow = Boolean(session?.isPlayerTurn && session.opportunities.at(-1)?.ply === chess.history().length - 1)
-  board.update(positionAt(position), orientation, session?.playerColor ?? null, Boolean(session?.isPlayerTurn) && !thinking && !viewingHistory)
+  board.update(visiblePosition, orientation, session?.playerColor ?? null, Boolean(session?.isPlayerTurn) && !thinking && !viewingHistory, hintMove)
   element<HTMLElement>('#status').textContent = viewingHistory
     ? position === 0 ? 'Viewing starting position' : `Viewing move ${position} of ${chess.history().length}`
     : session?.completed
@@ -451,6 +502,11 @@ function render(): void {
     }
   }
   element<HTMLButtonElement>('#copy-button').disabled = !session || moves.length === 0
+  const hintButton = element<HTMLButtonElement>('#hint-button')
+  hintButton.disabled = !session || thinking || reviewing || hintSearching || visiblePosition.isGameOver() || (!viewingHistory && !session.isPlayerTurn)
+  hintButton.textContent = hintSearching ? 'Thinking…' : hintMove ? 'Hide hint' : 'Hint'
+  hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
+  element<HTMLElement>('#hint-feedback').textContent = hintFeedback
   element<HTMLButtonElement>('#finish-button').disabled = !session || session.completed
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = !selectedOpening
@@ -576,6 +632,7 @@ element<HTMLButtonElement>('#copy-button').addEventListener('click', async () =>
   }
   window.setTimeout(() => { feedback.textContent = '' }, 2500)
 })
+element<HTMLButtonElement>('#hint-button').addEventListener('click', () => void revealHint())
 
 const savedOpening = restorePreferences()
 render()

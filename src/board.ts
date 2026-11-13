@@ -16,14 +16,16 @@ export class BoardView {
   private focusSquare: Square | null = null
   private allowedColor: Color | null = null
   private inputEnabled = true
+  private hint: MoveInput | null = null
 
   constructor(private container: HTMLElement, private onMove: (move: MoveInput) => void) {}
 
-  update(chess: Chess, orientation: Color, allowedColor: Color | null = null, inputEnabled = true): void {
+  update(chess: Chess, orientation: Color, allowedColor: Color | null = null, inputEnabled = true, hint: MoveInput | null = null): void {
     this.chess = chess
     this.orientation = orientation
     this.allowedColor = allowedColor
     this.inputEnabled = inputEnabled
+    this.hint = hint
     this.selected = null
     this.promotion = null
     this.draw()
@@ -41,8 +43,11 @@ export class BoardView {
       const classes = ['square', dark ? 'dark' : 'light']
       if (square === this.selected) classes.push('selected')
       if (legal.includes(square)) classes.push('legal')
+      if (square === this.hint?.from) classes.push('hint-from')
+      if (square === this.hint?.to) classes.push('hint-to')
       if (lastMove && (square === lastMove.from || square === lastMove.to)) classes.push('last-move')
-      const label = piece ? `${square}, ${piece.color === 'w' ? 'white' : 'black'} ${names[piece.type]}` : `${square}, empty`
+      const label = (piece ? `${square}, ${piece.color === 'w' ? 'white' : 'black'} ${names[piece.type]}` : `${square}, empty`)
+        + (square === this.hint?.from ? ', suggested move starts here' : square === this.hint?.to ? ', suggested move ends here' : '')
       const glyph = piece ? `<span class="piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'}" aria-hidden="true">${pieces[piece.color][piece.type]}</span>` : ''
       return `<button type="button" class="${classes.join(' ')}" data-square="${square}" aria-label="${label}" aria-pressed="${square === this.selected}">${glyph}<span class="coordinate" aria-hidden="true">${square}</span></button>`
     })).join('')
