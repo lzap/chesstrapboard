@@ -5,7 +5,7 @@ A static opening trainer for beginners. GitHub Actions builds the site for GitHu
 - Select a Lichess opening or leave it unset for a random line. Make your first move or press **New game** to begin.
 - Play as White or Black against the self-hosted Stockfish engine. It follows the opening when possible and may deliberately offer an advantage from its third move.
 - Adjust CPU difficulty, mistake frequency, and opportunity size. Turn on live evaluation if you want scores during play.
-- Use **Hint** for a suggested move. Optional local sounds and an opportunity cue can alert you during play.
+- Use **Hint** to highlight a suggested move on the board. Optional local sounds and an opportunity cue can alert you during play.
 - Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; an underlined CPU move marks an opportunity, followed by `!` or `?` on your reply.
 - Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.
 

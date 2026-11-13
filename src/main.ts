@@ -33,7 +33,6 @@ let evaluationError = ''
 let evaluationToken = 0
 let hintMove: MoveInput | null = null
 let hintSearching = false
-let hintFeedback = ''
 let hintToken = 0
 const evaluationCache = new Map<string, EngineScore | null>()
 const engine = new EngineClient()
@@ -108,7 +107,6 @@ function clearHint(): void {
   if (hintSearching) engine.stop()
   hintMove = null
   hintSearching = false
-  hintFeedback = ''
 }
 
 async function evaluateVisiblePosition(): Promise<void> {
@@ -218,7 +216,6 @@ async function revealHint(): Promise<void> {
   const fen = position.fen()
   const token = ++hintToken
   hintSearching = true
-  hintFeedback = 'Finding a suggested move…'
   render()
   try {
     const result = await engine.search(fen, Math.max(1200, difficultyBudget()))
@@ -226,13 +223,12 @@ async function revealHint(): Promise<void> {
     const move = result.bestMove && tryMove(new Chess(fen), fromUci(result.bestMove))
     if (!move) throw new Error('No legal suggestion was returned')
     hintMove = { from: move.from, to: move.to }
-    hintFeedback = `Suggested ${move.san}. Gold marks the start; blue marks the destination.`
     hintSearching = false
     render()
   } catch (error) {
     if (token !== hintToken || current !== session) return
     hintSearching = false
-    hintFeedback = `Hint unavailable: ${error instanceof Error ? error.message : 'engine search failed'}`
+    console.warn('[Chess Trap Board] Hint unavailable:', error)
     render()
   }
 }
@@ -510,7 +506,6 @@ function render(): void {
   hintButton.disabled = !session || thinking || reviewing || hintSearching || visiblePosition.isGameOver() || (!viewingHistory && !session.isPlayerTurn)
   hintButton.textContent = hintSearching ? 'Thinking…' : hintMove ? 'Hide hint' : 'Hint'
   hintButton.setAttribute('aria-pressed', String(Boolean(hintMove)))
-  element<HTMLElement>('#hint-feedback').textContent = hintFeedback
   element<HTMLButtonElement>('#finish-button').disabled = !session || reviewing || session.completed && Boolean(review)
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = openings.length === 0
