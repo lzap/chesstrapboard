@@ -31,10 +31,14 @@ describe('generated mistake selection', () => {
 
   it('separates frequency from the quality of an eligible mistake', () => {
     expect(shouldAttemptMistake('off', 0)).toBe(false)
-    expect(shouldAttemptMistake('rare', 0.09)).toBe(true)
-    expect(shouldAttemptMistake('rare', 0.10)).toBe(false)
-    expect(shouldAttemptMistake('often', 0.44)).toBe(true)
-    expect(shouldAttemptMistake('always', 0.99)).toBe(true)
+    expect(shouldAttemptMistake('rare', 0.24)).toBe(true)
+    expect(shouldAttemptMistake('rare', 0.25)).toBe(false)
+    expect(shouldAttemptMistake('sometimes', 0.49)).toBe(true)
+    expect(shouldAttemptMistake('sometimes', 0.5)).toBe(false)
+    expect(shouldAttemptMistake('often', 0.84)).toBe(true)
+    expect(shouldAttemptMistake('often', 0.85)).toBe(false)
+    expect(shouldAttemptMistake('almostAlways', 0.94)).toBe(true)
+    expect(shouldAttemptMistake('almostAlways', 0.95)).toBe(false)
   })
 
   it('requires a plausible short-search move with a deeper punishable downside', () => {

@@ -65,7 +65,8 @@ function restorePreferences(): [string, string] | null {
     sounds.moveEnabled = element<HTMLInputElement>('#sound-toggle').checked
     sounds.opportunityEnabled = element<HTMLInputElement>('#opportunity-sound-toggle').checked
     sounds.volume = Number(element<HTMLInputElement>('#sound-volume').value) / 100
-    for (const [id, value] of [['#difficulty', saved.difficulty], ['#mistake-frequency', saved.frequency], ['#mistake-size', saved.size]] as const) {
+    const frequency = saved.frequency === 'always' ? 'almostAlways' : saved.frequency
+    for (const [id, value] of [['#difficulty', saved.difficulty], ['#mistake-frequency', frequency], ['#mistake-size', saved.size]] as const) {
       const select = element<HTMLSelectElement>(id)
       if (typeof value === 'string' && [...select.options].some((option) => option.value === value)) select.value = value
     }
@@ -480,7 +481,7 @@ function wheelThroughMoves(event: WheelEvent): void {
   navigateTo(next)
 }
 
-for (const id of ['#board-container', '#move-list', '#review-panel']) {
+for (const id of ['#board-container', '#move-list', '#evaluation-panel', '#review-panel']) {
   element<HTMLElement>(id).addEventListener('wheel', wheelThroughMoves, { passive: false })
 }
 document.addEventListener('keydown', (event) => {

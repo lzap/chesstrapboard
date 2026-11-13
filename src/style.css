@@ -109,7 +109,8 @@ a { color: #d9bb78; }
 .pgn-panel .button { width: 100%; }
 #copy-feedback { display: block; color: #bdcabb; font-size: 11px; margin-top: 8px; }
 #copy-feedback:empty { display: none; }
-.review-panel { margin-bottom: 20px; }
+.evaluation-panel { margin-bottom: 20px; }
+.review-panel { border-top: 1px solid #ffffff20; margin-top: 20px; padding-top: 17px; }
 #review-button { display: block; margin: 0 0 8px auto; }
 .review-progress, .review-summary { color: #bdcabb; font-size: 11px; line-height: 1.5; }
 .review-progress:empty, .review-summary:empty { display: none; }

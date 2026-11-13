@@ -2,7 +2,7 @@ import { Chess } from 'chess.js'
 import type { SearchResult } from './engine'
 import { fromUci } from './openings'
 
-export type MistakeFrequency = 'off' | 'rare' | 'sometimes' | 'often' | 'always'
+export type MistakeFrequency = 'off' | 'rare' | 'sometimes' | 'often' | 'almostAlways'
 export type MistakeSize = 'mild' | 'medium' | 'large'
 
 export interface GeneratedOpportunity {
@@ -19,7 +19,7 @@ export interface CandidateMistake {
   lossCp: number
 }
 
-const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.1, sometimes: 0.25, often: 0.45, always: 1 }
+const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.25, sometimes: 0.5, often: 0.85, almostAlways: 0.95 }
 const bands: Record<MistakeSize, [number, number]> = { mild: [30, 100], medium: [60, 250], large: [150, 800] }
 const plausibleLoss: Record<MistakeSize, number> = { mild: 100, medium: 150, large: 200 }
 
