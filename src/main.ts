@@ -2,7 +2,7 @@ import { Chess, type Color, type Square } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore } from './engine'
-import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
+import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingPosition, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
 import { analyzeGame, formatScore, moveAnnotation, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
@@ -91,7 +91,7 @@ function positionPly(): number {
 function positionAt(ply: number): Chess {
   const current = session?.chess ?? previewChess
   if (!session || ply === current.history().length) return current
-  const position = new Chess()
+  const position = new Chess(session.initialFen)
   for (const move of current.history({ verbose: true }).slice(0, ply)) {
     position.move({ from: move.from, to: move.to, promotion: move.promotion })
   }
@@ -324,7 +324,8 @@ async function runCpu(): Promise<void> {
   const ply = current.chess.history().length
   const lastOpportunity = current.opportunities.at(-1)
   const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
-  const attempt = canSeekOpportunity(ply, current.availableOpeningLength, current.opportunities.length, lastOpportunity?.ply)
+  const attempt = canSeekOpportunity(current.absolutePly, current.availableOpeningLength, current.opportunities.length,
+    lastOpportunity ? current.startingPly + lastOpportunity.ply : undefined)
     && shouldAttemptMistake(frequency, Math.random())
   if (attempt) current.recordOpportunityCheck(ply)
   if (!attempt && current.advanceBook()) {
@@ -553,28 +554,30 @@ function render(): void {
     empty.textContent = 'The board is set. Your moves will appear here.'
     moveList.append(empty)
   } else {
-    for (let index = 0; index < moves.length; index += 2) {
+    const startingPly = session?.startingPly ?? 0
+    for (let absolute = Math.floor(startingPly / 2) * 2; absolute < startingPly + moves.length; absolute += 2) {
       const row = document.createElement('div')
       row.className = 'move-row'
       const number = document.createElement('span')
       number.className = 'move-number'
-      number.textContent = `${index / 2 + 1}.`
+      number.textContent = `${Math.floor(absolute / 2) + 1}.`
       row.append(number)
       for (let offset = 0; offset < 2; offset += 1) {
-        const ply = index + offset + 1
-        if (ply > moves.length) {
+        const index = absolute + offset - startingPly
+        if (index < 0 || index >= moves.length) {
           row.append(document.createElement('span'))
           continue
         }
+        const ply = index + 1
         const button = document.createElement('button')
         button.type = 'button'
         button.dataset.ply = String(ply)
         const entry = review?.entries[ply - 1]
         const mark = entry ? moveAnnotation(entry) : ''
         const annotationLabel = { '': '', '!': 'strong move', '!!': 'exceptional move', '?': 'mistake', '??': 'blunder' }[mark]
-        button.textContent = `${moves[ply - 1]}${mark}`
+        button.textContent = `${moves[index]}${mark}`
         button.setAttribute('aria-current', String(position === ply))
-        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? annotationLabel ? `, ${annotationLabel}` : '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
+        button.setAttribute('aria-label', `${Math.floor(absolute / 2) + 1}${offset === 0 ? '.' : '...'} ${moves[index]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? annotationLabel ? `, ${annotationLabel}` : '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
         if (entry?.opportunity) button.classList.add('generated-opportunity')
         button.addEventListener('click', () => navigateTo(ply))
         row.append(button)
@@ -604,18 +607,26 @@ function render(): void {
   element<HTMLButtonElement>('#take-back-button').disabled = !session?.canTakeBack
   element<HTMLButtonElement>('#retry-cpu-button').hidden = !engineError || !session?.isCpuTurn
   element<HTMLButtonElement>('#new-button').disabled = openings.length === 0
+  const selectedPosition = selectedOpening ? openingPosition(selectedOpening) : null
+  const openingButton = element<HTMLButtonElement>('#new-opening-button')
+  openingButton.textContent = selectedOpening ? `New ${selectedOpening.eco} game` : 'New opening game'
+  openingButton.disabled = !selectedPosition || selectedPosition.isGameOver()
+  openingButton.title = !selectedOpening ? 'Select an opening first' : selectedPosition?.isGameOver()
+    ? 'This opening already ends the game' : `Start from the final position of ${selectedOpening.name}`
+  openingButton.setAttribute('aria-label', openingButton.title)
   renderReview()
 }
 
-function startGame(initialMove?: MoveInput): void {
+function startGame(initialMove?: MoveInput, startAtOpening = false): void {
+  if (startAtOpening && !selectedOpening) return
   const opening = selectedOpening ?? pickOpening(openings, initialMove)
   if (!opening) return
   invalidateGame()
-  session = new TrainingSession(opening, playerColor, openingBook)
+  session = new TrainingSession(opening, playerColor, openingBook, startAtOpening)
   orientation = playerColor
   sounds.activate()
   if (session.chess.history().length) sounds.playAfterMove(session.chess)
-  if (initialMove && session.playPlayer(initialMove)) sounds.playAfterMove(session.chess)
+  if (initialMove && !startAtOpening && session.playPlayer(initialMove)) sounds.playAfterMove(session.chess)
   renderOpeningSelection()
   render()
   void evaluateVisiblePosition()
@@ -648,6 +659,7 @@ document.addEventListener('keydown', (event) => {
 
 element<HTMLInputElement>('#opening-search').addEventListener('input', renderOpeningResults)
 element<HTMLButtonElement>('#new-button').addEventListener('click', () => startGame())
+element<HTMLButtonElement>('#new-opening-button').addEventListener('click', () => startGame(undefined, true))
 element<HTMLButtonElement>('#take-back-button').addEventListener('click', () => {
   if (!session?.canTakeBack) return
   const current = session

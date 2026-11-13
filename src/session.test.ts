@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
 import { TrainingSession } from './session'
-import { classifyGame, fromUci, OpeningBook, openingSan, positionKey, type Opening } from './openings'
+import { exportPgn } from './chess'
+import { classifyGame, fromUci, OpeningBook, openingPosition, openingSan, positionKey, type Opening } from './openings'
+import { canSeekOpportunity } from './traps'
 
 const italian: Opening = {
   id: 1,
@@ -29,6 +31,40 @@ function bookFromLines(lines: string[][]): OpeningBook {
 }
 
 describe('opening-guided full game', () => {
+  it('starts at the selected opening position with a fresh move history and PGN setup', () => {
+    const session = new TrainingSession(italian, 'b', emptyBook, true)
+    expect(positionKey(openingPosition(italian))).toBe(italian.position)
+    expect(session.chess.fen()).toBe(session.initialFen)
+    expect(session.chess.history()).toEqual([])
+    expect(session.startingPly).toBe(5)
+    expect(session.absolutePly).toBe(5)
+    expect(session.openingReached).toBe(true)
+    expect(session.bookActive).toBe(false)
+    expect(session.isPlayerTurn).toBe(true)
+    expect(canSeekOpportunity(session.absolutePly, session.availableOpeningLength, 0)).toBe(true)
+    expect(session.playPlayer({ from: 'g8', to: 'f6' })?.san).toBe('Nf6')
+    const pgn = exportPgn(session.chess, 'CPU', 'Player', { name: italian.name, eco: italian.eco })
+    expect(pgn).toContain('[SetUp "1"]')
+    expect(pgn).toContain(`[FEN "${session.initialFen}"]`)
+    expect(pgn).toContain('3. ... Nf6 *')
+    expect(session.takeBack()).toBe(true)
+    expect(session.chess.fen()).toBe(session.initialFen)
+    expect(session.chess.history()).toEqual([])
+    expect(session.openingReached).toBe(true)
+    expect(session.bookActive).toBe(false)
+  })
+
+  it('lets the CPU move first from an opening position when needed', () => {
+    const book = bookFromLines([[...italian.moves, 'g8f6']])
+    const session = new TrainingSession(italian, 'w', book, true)
+    expect(session.chess.history()).toEqual([])
+    expect(session.isCpuTurn).toBe(true)
+    expect(session.advanceBook()?.san).toBe('Nf6')
+    expect(session.chess.history()).toEqual(['Nf6'])
+    expect(session.absolutePly).toBe(6)
+    expect(session.isPlayerTurn).toBe(true)
+  })
+
   it('offers every legal database move and the selected line in current or historical positions', () => {
     const book = bookFromLines([italian.moves, ['d2d4', 'd7d5']])
     const session = new TrainingSession(italian, 'w', book)

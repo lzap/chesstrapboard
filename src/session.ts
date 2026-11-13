@@ -1,12 +1,14 @@
 import { Chess, type Color, type Move } from 'chess.js'
 import { tryMove, type MoveInput } from './chess'
-import { fromUci, toUci, type Opening, type OpeningBook } from './openings'
+import { fromUci, openingPosition, toUci, type Opening, type OpeningBook } from './openings'
 import type { GeneratedOpportunity } from './traps'
 
 export class TrainingSession {
   readonly chess = new Chess()
   readonly opening: Opening
   readonly playerColor: Color
+  readonly initialFen: string
+  readonly startingPly: number
   bookActive = true
   openingReached = false
   completed = false
@@ -15,10 +17,17 @@ export class TrainingSession {
   private opportunityCheckPlies: number[] = []
   readonly opportunities: GeneratedOpportunity[] = []
 
-  constructor(opening: Opening, playerColor: Color, private readonly book: OpeningBook) {
+  constructor(opening: Opening, playerColor: Color, private readonly book: OpeningBook, startAtOpening = false) {
     this.opening = opening
     this.playerColor = playerColor
-    this.advanceBook()
+    this.startingPly = startAtOpening ? opening.moves.length : 0
+    this.initialFen = startAtOpening ? openingPosition(opening).fen() : this.chess.fen()
+    if (startAtOpening) {
+      this.chess.load(this.initialFen)
+      this.bookActive = false
+      this.openingReached = true
+      this.completed = this.chess.isGameOver()
+    } else this.advanceBook()
   }
 
   get isPlayerTurn(): boolean {
@@ -30,7 +39,11 @@ export class TrainingSession {
   }
 
   get nextBookMove(): string | undefined {
-    return this.bookActive ? this.opening.moves[this.chess.history().length] : undefined
+    return this.bookActive ? this.opening.moves[this.absolutePly] : undefined
+  }
+
+  get absolutePly(): number {
+    return this.startingPly + this.chess.history().length
   }
 
   get hasBookContinuation(): boolean {
@@ -44,8 +57,8 @@ export class TrainingSession {
   bookMovesAt(position: Chess): string[] {
     const choices = new Set(this.book.moves(position))
     const history = position.history({ verbose: true }).map(toUci)
-    const selected = this.opening.moves[history.length]
-    if (selected && history.every((move, index) => move === this.opening.moves[index])
+    const selected = this.opening.moves[this.startingPly + history.length]
+    if (selected && this.startingPly === 0 && history.every((move, index) => move === this.opening.moves[index])
       && position.moves({ verbose: true }).some((move) => toUci(move) === selected)) choices.add(selected)
     return [...choices]
   }
@@ -68,8 +81,8 @@ export class TrainingSession {
     if (lastPlayerIndex < 0) return false
     for (let index = history.length - 1; index >= lastPlayerIndex; index -= 1) this.chess.undo()
     const remaining = this.chess.history({ verbose: true }).map(toUci)
-    this.bookActive = remaining.every((move, index) => move === this.opening.moves[index])
-    this.openingReached = remaining.length >= this.opening.moves.length && this.opening.moves.every((move, index) => move === remaining[index])
+    this.bookActive = this.startingPly === 0 && remaining.every((move, index) => move === this.opening.moves[index])
+    this.openingReached = this.startingPly > 0 || remaining.length >= this.opening.moves.length && this.opening.moves.every((move, index) => move === remaining[index])
     this.opportunities.splice(0, this.opportunities.length, ...this.opportunities.filter((opportunity) => opportunity.ply < lastPlayerIndex))
     this.opportunityCheckPlies = this.opportunityCheckPlies.filter((ply) => ply < lastPlayerIndex)
     this.completed = false
@@ -83,7 +96,7 @@ export class TrainingSession {
     const move = tryMove(this.chess, input)
     if (!move) return null
     this.feedback = ''
-    if (toUci(move) !== this.opening.moves[this.chess.history().length - 1]) this.bookActive = false
+    if (toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
     this.updateProgress()
     if (this.chess.isGameOver()) this.completed = true
     return move
@@ -93,7 +106,7 @@ export class TrainingSession {
     if (!this.isCpuTurn) return null
     const move = tryMove(this.chess, input)
     if (!move) return null
-    if (toUci(move) !== this.opening.moves[this.chess.history().length - 1]) this.bookActive = false
+    if (toUci(move) !== this.opening.moves[this.absolutePly - 1]) this.bookActive = false
     this.updateProgress()
     if (this.chess.isGameOver()) this.completed = true
     return move
@@ -127,7 +140,7 @@ export class TrainingSession {
   }
 
   private updateProgress(): void {
-    if (this.bookActive && this.chess.history().length === this.opening.moves.length) {
+    if (this.bookActive && this.absolutePly === this.opening.moves.length) {
       this.openingReached = true
     }
   }

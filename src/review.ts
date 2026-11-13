@@ -143,7 +143,7 @@ export async function analyzeGame(
   cancelled: () => boolean,
 ): Promise<GameReview> {
   const moves = chess.history({ verbose: true })
-  const positions = [moves[0]?.before ?? new Chess().fen(), ...moves.map((move) => move.after)]
+  const positions = [moves[0]?.before ?? chess.fen(), ...moves.map((move) => move.after)]
   const results: SearchResult[] = new Array(positions.length)
   for (let index = positions.length - 1; index >= 0; index -= 1) {
     if (cancelled()) throw new Error('Review cancelled')

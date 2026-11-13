@@ -107,6 +107,12 @@ export function openingSan(opening: Opening): string[] {
   return opening.moves.map((uci) => chess.move(fromUci(uci)).san)
 }
 
+export function openingPosition(opening: Opening): Chess {
+  const chess = new Chess()
+  for (const move of opening.moves) chess.move(fromUci(move))
+  return chess
+}
+
 export function positionKey(chess: Chess): string {
   return chess.fen().split(' ').slice(0, 4).join(' ')
 }

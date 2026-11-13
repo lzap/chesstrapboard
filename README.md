@@ -2,9 +2,9 @@
 
 A static opening trainer for beginners. GitHub Actions builds the site for GitHub Pages at <https://lukas.zapletalovi.com/chesstrapboard/>. This is the HTTPS custom domain used by `lzap`'s Pages site.
 
-- Select a Lichess opening or leave it unset for a random line. Make your first move or press **New game** to begin.
+- Select a Lichess opening or leave it unset for a random line. Make your first move or press **New game** to begin from the usual board; **New ECO game** starts from the selected opening's final position.
 - Play as White or Black against the self-hosted Stockfish engine. If you leave the selected line, the computer uses moves from any matching database position, preferring moves that keep the book going. It uses the engine when no book move remains and may seek deliberate opportunities from its third move.
-- Adjust CPU difficulty, mistake frequency, and opportunity size. Normal engine play may choose randomly between two moves evaluated within 0.2 pawns of each other. Turn on live evaluation for scores during play; the last score stays visible while the next one is calculated.
+- Adjust CPU difficulty, mistake frequency, and opportunity size. New visitors start at Intermediate difficulty. Normal engine play may choose randomly between two moves evaluated within 0.2 pawns of each other. Turn on live evaluation for scores during play; the last score stays visible while the next one is calculated.
 - Use **Hint** to highlight a move on the board. In a book position, repeated presses cycle through every legal book move in a shuffled order; elsewhere Hint uses the engine. Optional local sounds and an opportunity cue can alert you during play. Checkmate and stalemate play the opportunity chime instead of the move tap.
 - Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; move across the line to preview it on the board. Sparse `!`, `!!`, `?`, and `??` marks highlight clear engine findings. An underlined CPU move marks an opportunity; its reply always gets `!` or `?` instead of a general mark.
 - Use **Take back** to redo your last move and any CPU reply. Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.

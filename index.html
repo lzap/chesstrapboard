@@ -23,7 +23,7 @@
           <label class="check-option" id="evaluation-option"><input id="evaluation-toggle" type="checkbox" /> Show evaluation during play</label>
           <div id="trap-controls" class="trap-controls">
             <label class="field-label" for="difficulty" title="Difficulty changes the engine's thinking time. It is not a measured Elo rating.">Computer difficulty</label>
-            <select id="difficulty" title="Difficulty changes the engine's thinking time. It is not a measured Elo rating."><option value="beginner" selected>Beginner · quicker moves</option><option value="intermediate">Intermediate</option><option value="strong">Strong · longer thinking</option></select>
+            <select id="difficulty" title="Difficulty changes the engine's thinking time. It is not a measured Elo rating."><option value="beginner">Beginner · quicker moves</option><option value="intermediate" selected>Intermediate</option><option value="strong">Strong · longer thinking</option></select>
             <label class="field-label setting-label" for="mistake-frequency" title="From its third move, the computer may look for a trap, even during a selected opening. Without a suitable mistake, it follows the line or plays normally. Attempts are spaced apart.">Deliberate mistake attempts</label>
             <select id="mistake-frequency" title="Opportunity checks begin on the computer's third move. Attempts are spaced apart; without a suitable mistake, the computer follows the opening or plays normally."><option value="off">Off</option><option value="rare">Occasional · 25% of eligible turns</option><option value="sometimes">Sometimes · 50%</option><option value="often">Often · 85%</option><option value="almostAlways" selected>Almost always · 95%</option></select>
             <label class="field-label setting-label" for="mistake-size" title="Target advantage after a deliberate CPU mistake: Mild about 0.3–1.0 pawns, Medium 0.6–2.5, Large 1.5–8.0. Engine estimates are not guaranteed.">Opportunity size</label>
@@ -38,7 +38,7 @@
           <div class="board-top"><span class="board-hint" id="board-hint">Loading openings…</span></div>
           <div id="board-container" class="board-container"></div>
           <div class="board-bottom"><p id="status" role="status" aria-live="polite"></p><button type="button" class="text-button" id="flip-button">↻ Flip board</button></div>
-          <div class="action-row"><button type="button" id="new-button" class="button button-primary">New game</button><button type="button" id="take-back-button" class="button button-secondary" disabled>Take back</button><button type="button" id="finish-button" class="button button-secondary">End game &amp; Analyze</button><button type="button" id="retry-cpu-button" class="button button-secondary" hidden>Retry engine</button></div>
+          <div class="action-row"><button type="button" id="new-button" class="button button-primary">New game</button><button type="button" id="new-opening-button" class="button button-secondary" disabled>New opening game</button><button type="button" id="take-back-button" class="button button-secondary" disabled>Take back</button><button type="button" id="finish-button" class="button button-secondary">End game &amp; Analyze</button><button type="button" id="retry-cpu-button" class="button button-secondary" hidden>Retry engine</button></div>
         </section>
         <aside class="panel moves-panel" aria-label="Analysis, moves, and PGN">
           <section id="evaluation-panel" class="evaluation-panel" aria-label="Evaluation">

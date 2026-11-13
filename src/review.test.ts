@@ -125,4 +125,15 @@ describe('postgame review', () => {
     expect(review.initialScore).toEqual({ kind: 'cp', value: 10 })
     expect(review.entries.map((entry) => entry.whiteScore)).toEqual([{ kind: 'cp', value: -20 }, { kind: 'cp', value: 30 }])
   })
+
+  it('reviews the setup position when a game starts from an opening FEN without moves', async () => {
+    const chess = new Chess('r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3')
+    const searched: string[] = []
+    const review = await analyzeGame(chess, async (fen) => {
+      searched.push(fen)
+      return { rootTurn: 'b', bestMove: 'g8f6', lines: [{ rank: 1, depth: 8, score: { kind: 'cp', value: 0 }, moves: ['g8f6'] }] }
+    }, [], () => undefined, () => false)
+    expect(searched).toEqual([chess.fen()])
+    expect(review.entries).toEqual([])
+  })
 })
