@@ -1,6 +1,6 @@
 # Project instructions
 
-- Keep `README.md`, this file, and `THIRD_PARTY_NOTICES.md` aligned with every feature or dependency change.
+- Keep `README.md` and this file aligned with every feature or dependency change. Keep all third-party credits and license references in README.
 - Keep the application fully static. GitHub Pages hosts the built site at `/chesstrapboard/` on `https://lukas.zapletalovi.com`; runtime assets come from this repository.
 - Maintain one full-game opening trainer. The CPU follows the selected opening while applicable, may seek engine-validated trap opportunities from its third move, and grades moves only afterward. Optional live evaluation may show an ungraded score during play and defaults off.
 - Keep CPU difficulty separate from the frequency and size of deliberate mistake attempts. Validate generated candidate moves and replies with `chess.js`, then confirm the advantage with a separate engine search from the resulting position; fall back to a book move or normal engine move when no candidate qualifies. Count attempted checks separately from generated opportunities and keep the postgame summary accurate.

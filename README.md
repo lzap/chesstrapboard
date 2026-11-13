@@ -1,4 +1,4 @@
-# CHESS TRAP BOARD
+# Chess Trap Board
 
 A static opening trainer for beginners. GitHub Actions builds the site for GitHub Pages at <https://lukas.zapletalovi.com/chesstrapboard/>. This is the HTTPS custom domain used by `lzap`'s Pages site.
 
@@ -44,8 +44,4 @@ This project's own code and synthesized sound are MIT licensed; see [LICENSE](LI
 | [TypeScript 7.0.2](https://github.com/microsoft/TypeScript) | Type checking | Apache-2.0 | [Upstream license](https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt) |
 | [Vitest 5.1.0](https://github.com/vitest-dev/vitest) | Unit tests | MIT | [Upstream license](https://github.com/vitest-dev/vitest/blob/main/LICENSE) |
 
-The lockfile pins transitive npm packages, and `npm run verify:licenses` rejects packages without one of the recorded free-software licenses. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) carries the exact versions and distribution notes. Runtime engine and opening data are hosted by this repository without a third-party service.
-
-## Design
-
-The [design](https://gist.github.com/lzap/649b7eec7f13ccdc16247c0419f5da1e) describes full-game opening practice with engine-generated trap opportunities and postgame analysis. The opening data, engine, and optional sound are self-hosted and credited.
+The lockfile pins all transitive npm packages; their license files are available in `node_modules` after `npm ci`. `npm run verify:licenses` checks each package license and compares the distributed chess.js notice with the installed package. The committed opening source and processed browser asset, the GPL engine files, and the optional sounds are described above. Runtime engine and opening data are hosted by this repository without a third-party service.
