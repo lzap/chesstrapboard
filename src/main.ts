@@ -3,7 +3,7 @@ import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore } from './engine'
 import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
-import { analyzeGame, formatScore, whiteShare, type GameReview } from './review'
+import { analyzeGame, formatScore, moveAnnotation, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
 import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
@@ -389,7 +389,7 @@ async function runReview(): Promise<void> {
   try {
     const result = await analyzeGame(
       current.chess,
-      (fen, milliseconds) => engine.search(fen, milliseconds),
+      (fen, milliseconds, multiPv) => engine.search(fen, milliseconds, multiPv),
       current.opportunities,
       (done, total) => {
         if (token !== generation || current !== session) return
@@ -403,7 +403,7 @@ async function runReview(): Promise<void> {
     review = result
     reviewing = false
     const actualOpening = classifyGame(current.chess, openings)
-    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${result.generated} generated; ${result.used} found, ${result.missed} missed. Underlines mark generated CPU moves; ! marks found replies and ? missed replies. Move grades are estimates.`)
+    console.info(`[Chess Trap Board] ${current.openingReached ? 'Opening reached.' : `Opening not reached${actualOpening ? `; position matched ${actualOpening.name}` : ''}.`} ${current.opportunityChecks} opportunity ${current.opportunityChecks === 1 ? 'check' : 'checks'}, ${result.generated} generated; ${result.used} found, ${result.missed} missed. Underlines mark generated CPU moves; opportunity replies use ! or ? in place of general annotations. Move marks are engine estimates.`)
     render()
   } catch (error) {
     if (token !== generation || current !== session) return
@@ -550,10 +550,11 @@ function render(): void {
         button.type = 'button'
         button.dataset.ply = String(ply)
         const entry = review?.entries[ply - 1]
-        const replyMark = entry?.replyFound === undefined ? '' : entry.replyFound ? '!' : '?'
-        button.textContent = `${moves[ply - 1]}${replyMark}`
+        const mark = entry ? moveAnnotation(entry) : ''
+        const annotationLabel = { '': '', '!': 'strong move', '!!': 'exceptional move', '?': 'mistake', '??': 'blunder' }[mark]
+        button.textContent = `${moves[ply - 1]}${mark}`
         button.setAttribute('aria-current', String(position === ply))
-        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
+        button.setAttribute('aria-label', `${Math.ceil(ply / 2)}${offset === 0 ? '.' : '...'} ${moves[ply - 1]}${entry?.opportunity ? ', generated opportunity' : ''}${entry?.replyFound === undefined ? annotationLabel ? `, ${annotationLabel}` : '' : entry.replyFound ? ', opportunity found' : ', opportunity missed'}`)
         if (entry?.opportunity) button.classList.add('generated-opportunity')
         button.addEventListener('click', () => navigateTo(ply))
         row.append(button)

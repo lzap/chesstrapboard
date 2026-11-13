@@ -6,7 +6,7 @@ A static opening trainer for beginners. GitHub Actions builds the site for GitHu
 - Play as White or Black against the self-hosted Stockfish engine. It follows the selected line, then other matching database moves, while still looking for deliberate opportunities from its third move.
 - Adjust CPU difficulty, mistake frequency, and opportunity size. Normal engine play may choose randomly between two moves evaluated within 0.2 pawns of each other. Turn on live evaluation for scores during play; the last score stays visible while the next one is calculated.
 - Use **Hint** to highlight a suggested move on the board. Optional local sounds and an opportunity cue can alert you during play.
-- Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; move across the line to preview it on the board. An underlined CPU move marks an opportunity, followed by `!` or `?` on your reply.
+- Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; move across the line to preview it on the board. Sparse `!`, `!!`, `?`, and `??` marks highlight clear engine findings. An underlined CPU move marks an opportunity; its reply always gets `!` or `?` instead of a general mark.
 - Use **Take back** to redo your last move and any CPU reply. Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.
 
 ## Development

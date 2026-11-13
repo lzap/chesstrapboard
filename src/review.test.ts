@@ -1,9 +1,48 @@
 import { describe, expect, it } from 'vitest'
 import { Chess } from 'chess.js'
-import { analyzeGame, buildReview, formatScore, whiteShare } from './review'
+import { analyzeGame, buildReview, formatScore, moveAnnotation, whiteShare } from './review'
 import type { SearchResult } from './engine'
 
 describe('postgame review', () => {
+  it.each([
+    { move: 'f3', before: 100, after: 0, second: null, mark: '' },
+    { move: 'f3', before: 100, after: 100, second: null, mark: '?' },
+    { move: 'f3', before: 100, after: 400, second: null, mark: '??' },
+    { move: 'e4', before: 100, after: -100, second: -80, mark: '!' },
+    { move: 'e4', before: 450, after: -450, second: 0, mark: '!!' },
+    { move: 'e4', before: 100, after: -100, second: null, mark: '' },
+  ])('uses sparse beginner-friendly annotations for $move at $before/$after', ({ move, before, after, second, mark }) => {
+    const chess = new Chess()
+    chess.move(move)
+    const moves = chess.history({ verbose: true })
+    const positions: SearchResult[] = [
+      { rootTurn: 'w', bestMove: 'e2e4', lines: [
+        { rank: 1, depth: 12, score: { kind: 'cp', value: before }, moves: ['e2e4'] },
+        ...(second === null ? [] : [{ rank: 2, depth: 12, score: { kind: 'cp' as const, value: second }, moves: ['d2d4'] }]),
+      ] },
+      { rootTurn: 'b', bestMove: 'e7e5', lines: [{ rank: 1, depth: 12, score: { kind: 'cp', value: after }, moves: ['e7e5'] }] },
+    ]
+    expect(buildReview(moves, positions, []).entries[0].annotation).toBe(mark)
+  })
+
+  it('lets opportunity replies override the general move annotation', () => {
+    expect(moveAnnotation({ annotation: '??', replyFound: true })).toBe('!')
+    expect(moveAnnotation({ annotation: '!!', replyFound: false })).toBe('?')
+    expect(moveAnnotation({ annotation: '?', replyFound: undefined })).toBe('?')
+  })
+
+  it('marks a newly allowed mate and a missed forced mate', () => {
+    const chess = new Chess()
+    chess.move('f3')
+    const moves = chess.history({ verbose: true })
+    const position = (rootTurn: 'w' | 'b', kind: 'cp' | 'mate', value: number): SearchResult => ({
+      rootTurn, bestMove: 'e2e4', lines: [{ rank: 1, depth: 12, score: { kind, value }, moves: ['e2e4'] }],
+    })
+    expect(buildReview(moves, [position('w', 'cp', 0), position('b', 'mate', 2)], []).entries[0].annotation).toBe('??')
+    expect(buildReview(moves, [position('w', 'mate', 3), position('b', 'cp', -100)], []).entries[0].annotation).toBe('?')
+    expect(buildReview(moves, [position('w', 'mate', 3), position('b', 'mate', -4)], []).entries[0].annotation).toBe('')
+  })
+
   it('grades an actual missed opportunity from the mover’s perspective', () => {
     const chess = new Chess()
     chess.move('e4')
@@ -74,12 +113,15 @@ describe('postgame review', () => {
     const fens = [moves[0].before, ...moves.map((move) => move.after)]
     const searched: string[] = []
     const progress: number[] = []
-    const review = await analyzeGame(chess, async (fen) => {
+    const multiPv: number[] = []
+    const review = await analyzeGame(chess, async (fen, _milliseconds, variations) => {
       searched.push(fen)
+      multiPv.push(variations)
       return { rootTurn: fen.split(' ')[1] as 'w' | 'b', bestMove: null, lines: [{ rank: 1, depth: 8, score: { kind: 'cp', value: (fens.indexOf(fen) + 1) * 10 }, moves: [] }] }
     }, [], (done) => progress.push(done), () => false)
     expect(searched).toEqual([...fens].reverse())
     expect(progress).toEqual([1, 2, 3])
+    expect(multiPv).toEqual([2, 2, 2])
     expect(review.initialScore).toEqual({ kind: 'cp', value: 10 })
     expect(review.entries.map((entry) => entry.whiteScore)).toEqual([{ kind: 'cp', value: -20 }, { kind: 'cp', value: 30 }])
   })

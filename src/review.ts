@@ -4,6 +4,7 @@ import { fromUci, toUci } from './openings'
 import type { GeneratedOpportunity } from './traps'
 
 export type Grade = 'best' | 'inaccuracy' | 'mistake' | 'blunder' | 'unrated'
+export type Annotation = '' | '!' | '!!' | '?' | '??'
 export type OpportunityOutcome = 'used' | 'partial' | 'missed' | 'unconfirmed' | 'no-reply'
 
 export interface ReviewEntry {
@@ -15,6 +16,7 @@ export interface ReviewEntry {
   bestMoves: string[]
   lossCp: number | null
   grade: Grade
+  annotation: Annotation
   whiteScore: EngineScore | null
   opportunity?: OpportunityOutcome
   replyFound?: boolean
@@ -26,6 +28,10 @@ export interface GameReview {
   generated: number
   used: number
   missed: number
+}
+
+export function moveAnnotation(entry: Pick<ReviewEntry, 'annotation' | 'replyFound'>): Annotation {
+  return entry.replyFound === undefined ? entry.annotation : entry.replyFound ? '!' : '?'
 }
 
 export function formatScore(score: EngineScore | null): string {
@@ -46,6 +52,28 @@ function gradeLoss(loss: number | null): Grade {
   if (loss <= 100) return 'inaccuracy'
   if (loss <= 250) return 'mistake'
   return 'blunder'
+}
+
+function annotateMove(move: Move, before: SearchResult | undefined, after: SearchResult | undefined, lossCp: number | null): Annotation {
+  const best = before?.lines.find((line) => line.rank === 1)
+  const afterBest = after?.lines.find((line) => line.rank === 1)
+  if (lossCp === null) {
+    if (best?.score.kind === 'cp' && best.score.value >= -300 && afterBest?.score.kind === 'mate' && afterBest.score.value > 0) return '??'
+    if (best?.score.kind === 'mate' && best.score.value > 0) {
+      if (afterBest?.score.kind === 'mate') return afterBest.score.value > 0 ? '??' : ''
+      if (afterBest?.score.kind === 'cp') return afterBest.score.value > 0 ? '??' : afterBest.score.value >= -300 ? '?' : ''
+    }
+    return ''
+  }
+  if (lossCp >= 500) return '??'
+  if (lossCp >= 200) return '?'
+  if (lossCp > 30) return ''
+  const second = before?.lines.find((line) => line.rank === 2)
+  if (!best || !second || best.score.kind !== 'cp' || second.score.kind !== 'cp' || best.moves[0] !== toUci(move)) return ''
+  const gap = best.score.value - second.score.value
+  if (gap >= 400 && best.score.value >= 150) return '!!'
+  if (gap >= 180 && best.score.value >= -100) return '!'
+  return ''
 }
 
 function lineSan(fen: string, moves: string[]): string {
@@ -77,6 +105,7 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
       bestMoves: best?.moves ?? [],
       lossCp,
       grade: gradeLoss(lossCp),
+      annotation: annotateMove(move, before, after, lossCp),
       whiteScore: afterScore,
     }
   })
@@ -108,7 +137,7 @@ export function buildReview(moves: Move[], positions: SearchResult[], opportunit
 
 export async function analyzeGame(
   chess: Chess,
-  search: (fen: string, milliseconds: number) => Promise<SearchResult>,
+  search: (fen: string, milliseconds: number, multiPv: number) => Promise<SearchResult>,
   opportunities: GeneratedOpportunity[],
   onProgress: (done: number, total: number) => void,
   cancelled: () => boolean,
@@ -120,7 +149,7 @@ export async function analyzeGame(
     if (cancelled()) throw new Error('Review cancelled')
     const fen = positions[index]
     const shouldDeepen = opportunities.some((opportunity) => index === opportunity.ply || index === opportunity.ply + 1 || index === opportunity.ply + 2)
-    results[index] = await search(fen, shouldDeepen ? 850 : 260)
+    results[index] = await search(fen, shouldDeepen ? 850 : 260, 2)
     onProgress(positions.length - index, positions.length)
   }
   if (cancelled()) throw new Error('Review cancelled')
