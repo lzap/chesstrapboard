@@ -3,8 +3,8 @@
 A static opening trainer for beginners. GitHub Actions builds the site for GitHub Pages at <https://lukas.zapletalovi.com/chesstrapboard/>. This is the HTTPS custom domain used by `lzap`'s Pages site.
 
 - Select a Lichess opening or leave it unset for a random line. Make your first move or press **New game** to begin.
-- Play as White or Black against the self-hosted Stockfish engine. It follows the opening when possible and may deliberately offer an advantage from its third move.
-- Adjust CPU difficulty, mistake frequency, and opportunity size. Turn on live evaluation if you want scores during play.
+- Play as White or Black against the self-hosted Stockfish engine. It follows the selected line, then other matching database moves, while still looking for deliberate opportunities from its third move.
+- Adjust CPU difficulty, mistake frequency, and opportunity size. Normal engine play may choose randomly between two moves evaluated within 0.2 pawns of each other. Turn on live evaluation if you want scores during play.
 - Use **Hint** to highlight a suggested move on the board. Optional local sounds and an opportunity cue can alert you during play.
 - Finish with **End game & Analyze**, or play to a natural ending. Review the evaluation and suggested line; an underlined CPU move marks an opportunity, followed by `!` or `?` on your reply.
 - Click moves or use the wheel and arrow keys to replay the game, then use **Copy PGN** to export it.
@@ -26,7 +26,7 @@ npm run dev
 
 The Vite base path is `/chesstrapboard/` for project Pages. The deploy workflow builds `dist/` and publishes it using the GitHub Pages artifact actions.
 
-The opening snapshot in `data/upstream/` is pinned to [Lichess chess-openings commit `3ba6b20`](https://github.com/lichess-org/chess-openings/commit/3ba6b20d31b2e6125cb0e6a2e792f400717d9d39). The browser-ready `public/data/openings.json` is committed. Refresh it deliberately with `npm run prepare:data`; CI checks it with `npm run verify:data`. The served file is about 736 KB raw and 93 KB with gzip. The browser never fetches from Lichess.
+The opening snapshot in `data/upstream/` is pinned to [Lichess chess-openings commit `3ba6b20`](https://github.com/lichess-org/chess-openings/commit/3ba6b20d31b2e6125cb0e6a2e792f400717d9d39). The browser-ready `public/data/openings.json` and position-indexed `public/data/book.json` are committed. Refresh both deliberately with `npm run prepare:data`; CI checks them with `npm run verify:data`. The served files total about 150 KB with gzip. The position book can continue through a matching line after the selected name ends or the move order changes. The browser never fetches from Lichess.
 
 The engine's matching Worker and WASM files are committed under `public/engine/`. The browser loads them from this site for CPU moves, postgame review, or optional live evaluation. Their exact release, checksums, GPL-3.0 license, and corresponding source are recorded in [public/engine/SOURCE.md](public/engine/SOURCE.md). This repository's MIT license covers our own application code; the engine remains GPL-3.0.
 

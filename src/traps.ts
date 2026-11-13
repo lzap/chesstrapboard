@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js'
 import type { SearchResult } from './engine'
-import { fromUci } from './openings'
+import { fromUci, toUci } from './openings'
 
 export type MistakeFrequency = 'off' | 'rare' | 'sometimes' | 'often' | 'almostAlways'
 export type MistakeSize = 'mild' | 'medium' | 'large'
@@ -22,6 +22,23 @@ export interface CandidateMistake {
 const chances: Record<MistakeFrequency, number> = { off: 0, rare: 0.25, sometimes: 0.5, often: 0.85, almostAlways: 0.95 }
 const bands: Record<MistakeSize, [number, number]> = { mild: [30, 100], medium: [60, 250], large: [150, 800] }
 const plausibleLoss: Record<MistakeSize, number> = { mild: 100, medium: 150, large: 200 }
+export const nearEqualThresholdCp = 20
+
+export function selectEngineMove(fen: string, result: SearchResult, random = Math.random): string | null {
+  const legal = new Set(new Chess(fen).moves({ verbose: true }).map(toUci))
+  const first = result.lines.find((line) => line.rank === 1)
+  const second = result.lines.find((line) => line.rank === 2)
+  const best = first?.moves[0] && legal.has(first.moves[0]) ? first.moves[0]
+    : result.bestMove && legal.has(result.bestMove) ? result.bestMove : null
+  if (!best) return null
+  const alternative = second?.moves[0]
+  if (first?.moves[0] === best && first.score.kind === 'cp' && second?.score.kind === 'cp'
+    && alternative && alternative !== best && legal.has(alternative)
+    && Math.abs(first.score.value - second.score.value) <= nearEqualThresholdCp) {
+    return random() < 0.5 ? best : alternative
+  }
+  return best
+}
 
 export function shouldAttemptMistake(frequency: MistakeFrequency, random: number): boolean {
   return random < chances[frequency]

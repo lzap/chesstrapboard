@@ -2,17 +2,18 @@ import { Chess, type Color, type Square } from 'chess.js'
 import { BoardView } from './board'
 import { exportPgn, gameStatus, tryMove, type MoveInput } from './chess'
 import { EngineClient, scoreForWhite, type EngineScore } from './engine'
-import { classifyGame, fromUci, loadOpenings, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
+import { classifyGame, fromUci, loadOpeningBook, loadOpenings, OpeningBook, openingSan, pickOpening, searchOpenings, type Opening } from './openings'
 import { analyzeGame, formatScore, whiteShare, type GameReview } from './review'
 import { TrainingSession } from './session'
 import { GameSounds } from './sound'
-import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
+import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake, type MistakeFrequency, type MistakeSize } from './traps'
 import './style.css'
 
 const element = <T extends HTMLElement>(selector: string): T => document.querySelector<T>(selector)!
 const previewChess = new Chess()
 const preferencesKey = 'chess-trap-board-preferences-v1'
 let openings: Opening[] = []
+let openingBook = new OpeningBook([])
 let selectedOpening: Opening | null = null
 let session: TrainingSession | null = null
 let playerColor: Color = 'w'
@@ -239,7 +240,7 @@ async function runCpu(): Promise<void> {
   const ply = current.chess.history().length
   const lastOpportunity = current.opportunities.at(-1)
   const frequency = element<HTMLSelectElement>('#mistake-frequency').value as MistakeFrequency
-  const attempt = canSeekOpportunity(ply, current.opening.moves.length, current.opportunities.length, lastOpportunity?.ply)
+  const attempt = canSeekOpportunity(ply, current.availableOpeningLength, current.opportunities.length, lastOpportunity?.ply)
     && shouldAttemptMistake(frequency, Math.random())
   if (attempt) current.opportunityChecks += 1
   if (!attempt && current.advanceBook()) {
@@ -280,10 +281,10 @@ async function runCpu(): Promise<void> {
       if (current.completed) void runReview()
       return
     }
-    result ??= await engine.search(fen, difficultyBudget())
+    result ??= await engine.search(fen, difficultyBudget(), 2)
     if (token !== generation || current !== session) return
     thinking = false
-    const chosenMove = candidate?.move ?? result.bestMove
+    const chosenMove = candidate?.move ?? selectEngineMove(fen, result)
     if (!chosenMove || !current.playCpu(fromUci(chosenMove))) throw new Error('Engine did not return a legal move')
     if (candidate) {
       current.opportunities.push({ fen, ply, cpuMove: candidate.move, suggestedReply: candidate.reply, estimatedLossCp: candidate.lossCp })
@@ -454,7 +455,7 @@ function render(): void {
   boardHint.classList.toggle('opportunity-cue', showOpportunityCue)
   boardHint.textContent = viewingHistory ? 'History' : showOpportunityCue
     ? 'Possible opportunity · find your best reply'
-    : session ? session.openingReached ? 'Opening reached · full game' : session.bookActive ? 'Following opening' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
+    : session ? session.openingReached ? session.hasBookContinuation ? 'Opening reached · following database' : 'Opening reached · full game' : session.hasBookContinuation ? 'Following opening' : 'Full game' : openings.length ? 'Make a move to begin' : loadError || 'Loading openings…'
   element<HTMLElement>('#feedback').textContent = session?.feedback || (thinking ? 'The engine is choosing a move. Its files are hosted by this site.' : reviewing ? 'Reviewing the finished game…' : session?.completed ? 'Game finished. Review the moves below.' : session ? 'Play the whole game. Review comes after it ends.' : loadError || (openings.length ? '' : 'Loading openings…'))
   const moves = chess.history()
   element<HTMLElement>('#move-count').textContent = `${moves.length} ${moves.length === 1 ? 'move' : 'moves'}`
@@ -516,7 +517,7 @@ function startGame(initialMove?: MoveInput): void {
   const opening = selectedOpening ?? pickOpening(openings, initialMove)
   if (!opening) return
   invalidateGame()
-  session = new TrainingSession(opening, playerColor)
+  session = new TrainingSession(opening, playerColor, openingBook)
   orientation = playerColor
   sounds.activate()
   if (session.chess.history().length) sounds.playMove()
@@ -640,8 +641,9 @@ element<HTMLButtonElement>('#hint-button').addEventListener('click', () => void 
 
 const savedOpening = restorePreferences()
 render()
-loadOpenings().then((loaded) => {
+Promise.all([loadOpenings(), loadOpeningBook()]).then(([loaded, book]) => {
   openings = loaded
+  openingBook = book
   selectedOpening = savedOpening ? openings.find((opening) => opening.eco === savedOpening[0] && opening.name === savedOpening[1]) ?? null : null
   renderOpeningResults()
   renderOpeningSelection()

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { pickOpening, type Opening } from './openings'
+import { Chess } from 'chess.js'
+import { OpeningBook, pickOpening, positionKey, type Opening } from './openings'
 
 const options: Opening[] = [
   { id: 0, eco: 'C50', name: 'Italian Game', moves: ['e2e4', 'e7e5'], position: '' },
@@ -17,5 +18,17 @@ describe('optional opening selection', () => {
     expect(pickOpening(options, undefined, () => 0.99)?.name).toBe("Queen's Gambit")
     expect(pickOpening(options, { from: 'g1', to: 'h3' }, () => 0.99)?.name).toBe("Queen's Gambit")
     expect(pickOpening([])).toBeNull()
+  })
+
+  it('finds a legal database continuation after a move-order transposition', () => {
+    const source = new Chess()
+    for (const move of ['d4', 'Nf6', 'c4', 'e6']) source.move(move)
+    const transposed = new Chess()
+    for (const move of ['d4', 'e6', 'c4', 'Nf6']) transposed.move(move)
+    expect(positionKey(transposed)).toBe(positionKey(source))
+    const book = new OpeningBook([[positionKey(source), ['e2e5', 'g1f3'], 12]])
+    expect(book.hasContinuation(transposed)).toBe(true)
+    expect(book.longestLinePly(transposed)).toBe(12)
+    expect(book.pickMove(transposed)).toBe('g1f3')
   })
 })

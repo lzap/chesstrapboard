@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, shouldAttemptMistake } from './traps'
+import { canSeekOpportunity, confirmCandidateMistake, findCandidateMistake, selectEngineMove, shouldAttemptMistake } from './traps'
 import type { SearchResult } from './engine'
 
 const shallow: SearchResult = {
@@ -19,6 +19,18 @@ const deep: SearchResult = {
 const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
 
 describe('generated mistake selection', () => {
+  it('randomizes only between legal moves within 0.2 pawns of the best', () => {
+    const starting = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    const close: SearchResult = { rootTurn: 'w', bestMove: 'e2e4', lines: [
+      { rank: 1, depth: 12, score: { kind: 'cp', value: 25 }, moves: ['e2e4'] },
+      { rank: 2, depth: 12, score: { kind: 'cp', value: 10 }, moves: ['d2d4'] },
+    ] }
+    expect(selectEngineMove(starting, close, () => 0)).toBe('e2e4')
+    expect(selectEngineMove(starting, close, () => 0.99)).toBe('d2d4')
+    expect(selectEngineMove(starting, { ...close, lines: [close.lines[0], { ...close.lines[1], score: { kind: 'cp', value: 4 } }] }, () => 0.99)).toBe('e2e4')
+    expect(selectEngineMove(starting, { ...close, lines: [close.lines[0], { ...close.lines[1], moves: ['e2e5'] }] }, () => 0.99)).toBe('e2e4')
+    expect(selectEngineMove(starting, { ...close, lines: [{ ...close.lines[0], score: { kind: 'mate', value: 3 } }, close.lines[1]] }, () => 0.99)).toBe('e2e4')
+  })
   it('starts seeking on the CPU third move, including during a longer selected line', () => {
     expect(canSeekOpportunity(3, 12, 0)).toBe(false)
     expect(canSeekOpportunity(4, 12, 0)).toBe(true) // White CPU about to play move 3.

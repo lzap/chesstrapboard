@@ -16,6 +16,13 @@ interface OpeningFile {
   openings: [string, string, string[], string][]
 }
 
+interface BookFile {
+  version: number
+  source: string
+  commit: string
+  positions: [string, string[], number][]
+}
+
 const featuredNames = ['Italian Game', 'Ruy Lopez', 'Sicilian Defense', "Queen's Gambit", 'French Defense', 'Caro-Kann Defense']
 
 export async function loadOpenings(): Promise<Opening[]> {
@@ -24,6 +31,38 @@ export async function loadOpenings(): Promise<Opening[]> {
   const file = await response.json() as OpeningFile
   if (file.version !== 1 || !Array.isArray(file.openings)) throw new Error('Opening file has an unsupported format')
   return file.openings.map(([eco, name, moves, position], id) => ({ id, eco, name, moves, position }))
+}
+
+export async function loadOpeningBook(): Promise<OpeningBook> {
+  const response = await fetch(`${import.meta.env.BASE_URL}data/book.json`)
+  if (!response.ok) throw new Error(`Opening book could not be loaded (${response.status})`)
+  const file = await response.json() as BookFile
+  if (file.version !== 1 || !Array.isArray(file.positions)) throw new Error('Opening book has an unsupported format')
+  return new OpeningBook(file.positions)
+}
+
+export class OpeningBook {
+  private readonly positions: Map<string, { choices: string[]; maxPly: number }>
+
+  constructor(positions: [string, string[], number][]) {
+    this.positions = new Map(positions.map(([position, choices, maxPly]) => [position, { choices, maxPly }]))
+  }
+
+  hasContinuation(chess: Chess): boolean {
+    return this.positions.has(positionKey(chess))
+  }
+
+  longestLinePly(chess: Chess): number {
+    return this.positions.get(positionKey(chess))?.maxPly ?? 0
+  }
+
+  pickMove(chess: Chess, random = Math.random): string | null {
+    const entry = this.positions.get(positionKey(chess))
+    if (!entry) return null
+    const legal = new Set(chess.moves({ verbose: true }).map(toUci))
+    const candidates = entry.choices.filter((move) => legal.has(move))
+    return candidates[Math.floor(random() * candidates.length)] ?? null
+  }
 }
 
 export function searchOpenings(openings: Opening[], query: string, limit = 12): Opening[] {

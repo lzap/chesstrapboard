@@ -1,6 +1,6 @@
 import { Chess, type Color, type Move } from 'chess.js'
 import { tryMove, type MoveInput } from './chess'
-import { fromUci, toUci, type Opening } from './openings'
+import { fromUci, toUci, type Opening, type OpeningBook } from './openings'
 import type { GeneratedOpportunity } from './traps'
 
 export class TrainingSession {
@@ -15,7 +15,7 @@ export class TrainingSession {
   opportunityChecks = 0
   readonly opportunities: GeneratedOpportunity[] = []
 
-  constructor(opening: Opening, playerColor: Color) {
+  constructor(opening: Opening, playerColor: Color, private readonly book: OpeningBook) {
     this.opening = opening
     this.playerColor = playerColor
     this.advanceBook()
@@ -33,6 +33,14 @@ export class TrainingSession {
     return this.bookActive ? this.opening.moves[this.chess.history().length] : undefined
   }
 
+  get hasBookContinuation(): boolean {
+    return Boolean(this.nextBookMove) || this.book.hasContinuation(this.chess)
+  }
+
+  get availableOpeningLength(): number {
+    return Math.max(this.opening.moves.length, this.book.longestLinePly(this.chess))
+  }
+
   playPlayer(input: MoveInput): Move | null {
     if (!this.isPlayerTurn) return null
     const move = tryMove(this.chess, input)
@@ -48,7 +56,8 @@ export class TrainingSession {
     if (!this.isCpuTurn) return null
     const move = tryMove(this.chess, input)
     if (!move) return null
-    this.bookActive = false
+    if (toUci(move) !== this.opening.moves[this.chess.history().length - 1]) this.bookActive = false
+    this.updateProgress()
     if (this.chess.isGameOver()) this.completed = true
     return move
   }
@@ -61,18 +70,22 @@ export class TrainingSession {
   }
 
   advanceBook(): Move | null {
-    if (!this.isCpuTurn || !this.bookActive) return null
-    const expected = this.nextBookMove
-    if (!expected) {
-      this.updateProgress()
-      return null
-    }
-    const move = tryMove(this.chess, fromUci(expected))
-    if (!move) {
+    if (!this.isCpuTurn) return null
+    if (this.nextBookMove) {
+      const move = tryMove(this.chess, fromUci(this.nextBookMove))
+      if (move) {
+        this.updateProgress()
+        if (this.chess.isGameOver()) this.completed = true
+        return move
+      }
       this.bookActive = false
-      return null
     }
-    this.updateProgress()
+    const choice = this.book.pickMove(this.chess)
+    if (!choice) return null
+    const move = tryMove(this.chess, fromUci(choice))
+    if (!move) return null
+    this.bookActive = false
+    if (this.chess.isGameOver()) this.completed = true
     return move
   }
 
